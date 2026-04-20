@@ -1,0 +1,19 @@
+# Секреты и состояние — НЕ КОММИТИТЬ
+.env
+data/
+.settings_key
+
+# IDE / временное
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+
+# Прочее
+*.log
+*.tmp

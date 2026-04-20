@@ -1,0 +1,38 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  auth:
+    build: ./auth
+    container_name: sc-auth
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DB_PATH=/data/users.db
+    volumes:
+      - ./data:/data
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/healthz').read()"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    logging: *default-logging
+
+  web:
+    image: nginx:1.27-alpine
+    container_name: sc-web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./html:/usr/share/nginx/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - auth
+    logging: *default-logging
