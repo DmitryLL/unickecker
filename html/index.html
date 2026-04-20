@@ -358,13 +358,15 @@
             max-width: 720px;
         }
         .op-card-head {
-            display: flex; align-items: center; justify-content: flex-end;
-            padding: 16px 22px 10px; gap: 12px;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 18px; gap: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         }
-        .op-head-right { display: flex; align-items: center; gap: 10px; }
+        .op-head-left  { display: flex; align-items: center; gap: 8px; }
+        .op-head-right { display: flex; align-items: center; gap: 8px; }
         .copy-btn {
-            display: inline-flex; align-items: center; gap: 6px;
-            padding: 6px 12px; font-size: 13px; font-weight: 500;
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 10px; font-size: 12px; font-weight: 500;
             color: #e5e7eb;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -376,31 +378,31 @@
         .copy-btn.done { background: rgba(16,185,129,0.12); color: #34d399; border-color: rgba(16,185,129,0.35); }
         .copy-btn svg { width: 14px; height: 14px; stroke-width: 2; }
         .op-section {
-            padding: 4px 22px 18px;
+            padding: 6px 18px 10px;
         }
         .op-section-sender {
-            padding: 14px 22px 14px;
+            padding: 8px 18px;
             background: rgba(255, 255, 255, 0.025);
             border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         }
         .op-section-title {
             font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
             color: #6b7280; font-weight: 600;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
         }
-        .op-rows { display: grid; grid-template-columns: 180px 1fr; gap: 6px 16px; }
-        .op-rows dt { color: #9ca3af; font-size: 13px; padding: 3px 0; }
-        .op-rows dd { color: #f3f4f6; font-size: 14px; padding: 3px 0; word-break: break-word; }
+        .op-rows { display: grid; grid-template-columns: 170px 1fr; gap: 1px 14px; }
+        .op-rows dt { color: #9ca3af; font-size: 12.5px; padding: 1px 0; line-height: 1.35; }
+        .op-rows dd { color: #f3f4f6; font-size: 13px; padding: 1px 0; line-height: 1.35; word-break: break-word; }
         .op-note {
-            margin-top: 14px; padding: 12px 14px;
+            margin-top: 8px; padding: 8px 12px;
             background: rgba(234, 179, 8, 0.08);
             border: 1px solid rgba(234, 179, 8, 0.25);
-            color: #fde68a; border-radius: 10px;
-            font-size: 13px; line-height: 1.5;
+            color: #fde68a; border-radius: 8px;
+            font-size: 12.5px; line-height: 1.45;
         }
         .op-info {
-            margin-top: 14px; padding: 14px 16px;
-            display: flex; gap: 12px; align-items: flex-start;
+            margin-top: 8px; padding: 10px 14px;
+            display: flex; gap: 10px; align-items: flex-start;
             background: rgba(56, 189, 248, 0.07);
             border: 1px solid rgba(56, 189, 248, 0.22);
             border-left-width: 3px;
@@ -413,17 +415,17 @@
         }
         .op-info-body { flex: 1 1 auto; min-width: 0; }
         .op-info-title {
-            color: #f0f9ff; font-weight: 600; font-size: 13px;
-            margin-bottom: 4px; letter-spacing: 0.01em;
+            color: #f0f9ff; font-weight: 600; font-size: 12.5px;
+            margin-bottom: 2px; letter-spacing: 0.01em;
         }
         .op-info-text {
-            color: #cbd5e1; font-size: 13px; line-height: 1.55;
+            color: #cbd5e1; font-size: 12.5px; line-height: 1.4;
         }
         .op-info-status { font-weight: 600; padding: 0 1px; }
         .op-info-status-ok { color: #34d399; }
         .op-info-status-wait { color: #fde68a; }
         .op-info-status-err { color: #fca5a5; }
-        .op-info-line + .op-info-line { margin-top: 6px; }
+        .op-info-line + .op-info-line { margin-top: 3px; }
         .op-info-code {
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             font-size: 12px;
@@ -443,24 +445,24 @@
         }
         .op-info--wait .op-info-icon { color: #fbbf24; }
         .op-tg-template {
-            margin-top: 12px;
+            margin-top: 8px;
             border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 8px;
+            border-radius: 6px;
             background: rgba(0,0,0,0.18);
         }
         .op-tg-template-header {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 8px 12px;
+            padding: 5px 10px;
             border-bottom: 1px solid rgba(255,255,255,0.06);
         }
         .op-tg-template-label {
-            font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+            font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em;
             color: #9ca3af; font-weight: 600;
         }
         .op-tg-template-body {
-            margin: 0; padding: 10px 12px;
+            margin: 0; padding: 6px 10px;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 12.5px; line-height: 1.5;
+            font-size: 11.5px; line-height: 1.35;
             color: #e5e7eb; white-space: pre-wrap; word-break: break-word;
         }
         .status-chip {
@@ -850,9 +852,11 @@
                 <div class="op-card">
                     ${senderBlock}
                     <div class="op-card-head">
+                        <div class="op-head-left">
+                            <span class="status-chip ${chipCls}">${escapeHtml(r.status_label || '—')}</span>
+                        </div>
                         <div class="op-head-right">
                             ${copyBtn}
-                            <span class="status-chip ${chipCls}">${escapeHtml(r.status_label || '—')}</span>
                         </div>
                     </div>
                     ${body}${note}${info}

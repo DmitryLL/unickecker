@@ -347,9 +347,9 @@ STATUS_LABELS = {
     1: "Created (Создана)",
     2: "Accepted (Принят)",
     3: "Confirmed (Подтверждён)",
-    4: "Successful (Успешна)",
+    4: "Completed (Успешна)",
     5: "Corrupted (Повреждён)",
-    6: "Failed (Не выполнен)",
+    6: "Failed (Неуспешен)",
     7: "Canceled (Отменён)",
 }
 # Статусы из USDB.dbo.Transfer.Transfer_Status
@@ -752,7 +752,7 @@ def parse_operation(row):
 
     sender_rows = [
         ["Статус",                  result["status_label"]],
-        ["Статус в главной базе",   get_usdb_status_text(result["knp"])],
+        ["Статус в ПОЮ",            get_usdb_status_text(result["knp"])],
         ["Тип операции",            op_type],
     ]
     if gate not in ("arca", "compass"):
@@ -975,11 +975,10 @@ def op_lookup():
             try:
                 cur = conn.cursor(as_dict=True)
                 cur.execute(
-                    "SELECT TOP 1 [Id],[AlterControl],[Date],[Status],[OperationType],"
-                    "[AgentId],[PointOfServiceId],[JsonData] "
+                    "SELECT TOP 1 [AlterControl], [JsonData] "
                     "FROM [dbo].[OperationModel] "
                     "WHERE [AlterControl] = %s "
-                    "ORDER BY [Date] DESC",
+                    "ORDER BY [Id] DESC",
                     (knp,),
                 )
                 row = cur.fetchone()
@@ -1022,8 +1021,8 @@ def op_lookup():
             "supported": False,
             "message": cpl_message,
             "sender_rows": [
-                ["Статус",                "—"],
-                ["Статус в главной базе", usdb_text],
+                ["Статус",       "—"],
+                ["Статус в ПОЮ", usdb_text],
             ],
             "rows": [
                 ["КНП", knp],
@@ -1032,7 +1031,7 @@ def op_lookup():
     elif usdb_unreachable:
         # CPL дала полную карточку, но USDB сейчас недоступна —
         # покажем плашку, чтобы кассир видел, что «Статус в главной базе» не достоверен.
-        parsed["message"] = ("USDB сейчас недоступна — поле «Статус в главной базе» "
+        parsed["message"] = ("USDB сейчас недоступна — поле «Статус в ПОЮ» "
                              "получить не удалось. Данные ниже — только из CPL.")
 
     return jsonify({"status": "ok", "result": parsed})
