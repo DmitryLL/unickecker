@@ -220,6 +220,34 @@
             box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
             max-height: calc(100vh - 40px);
             overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(99, 102, 241, 0.45) transparent;
+        }
+        .modal::-webkit-scrollbar { width: 10px; }
+        .modal::-webkit-scrollbar-track { background: transparent; margin: 12px 0; }
+        .modal::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, rgba(99, 102, 241, 0.45), rgba(99, 102, 241, 0.25));
+            border-radius: 10px;
+            border: 2px solid #111827;
+            min-height: 40px;
+        }
+        .modal::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, rgba(99, 102, 241, 0.75), rgba(99, 102, 241, 0.45));
+        }
+        .confirm-nodes {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(99, 102, 241, 0.45) transparent;
+        }
+        .confirm-nodes::-webkit-scrollbar { width: 8px; }
+        .confirm-nodes::-webkit-scrollbar-track { background: transparent; margin: 6px 0; }
+        .confirm-nodes::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, rgba(99, 102, 241, 0.5), rgba(99, 102, 241, 0.25));
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            min-height: 30px;
+        }
+        .confirm-nodes::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, rgba(99, 102, 241, 0.8), rgba(99, 102, 241, 0.5));
         }
         .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
         .modal-sub { font-size: 13px; color: #6b7280; margin-bottom: 22px; }
@@ -281,6 +309,103 @@
             display: flex; justify-content: flex-end; gap: 8px;
             margin-top: 20px;
         }
+        .modal-confirm { max-width: 760px; text-align: center; padding: 18px 22px 16px; }
+        .modal-confirm.compact { max-width: 420px; padding: 22px 24px 18px; }
+        .modal-confirm.compact .confirm-nodes { display: none; }
+        .modal-confirm.compact .modal-sub { margin-bottom: 16px; }
+        .modal-confirm.compact .modal-actions { margin-top: 0; }
+        .modal-confirm .modal-title { font-size: 18px; margin-bottom: 0; }
+        .modal-confirm .modal-sub { margin: 8px 0 12px; color: #cbd5e1; }
+        .modal-confirm .modal-sub:empty { display: none; }
+        .confirm-icon { display: none; }
+        .confirm-nodes {
+            display: flex; flex-direction: column; gap: 6px;
+            height: 380px; overflow-y: auto;
+            padding: 12px 14px;
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-bottom: 14px;
+            text-align: left;
+        }
+        .confirm-node-row {
+            display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        }
+        .confirm-node-label {
+            flex-shrink: 0; width: 100px;
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+            color: #6b7280; font-weight: 600;
+        }
+        .confirm-node-pill {
+            padding: 3px 9px; border-radius: 14px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            color: #c7d2fe; font-size: 12px;
+            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        }
+        .confirm-svc-group {
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 10px 0;
+        }
+        .confirm-svc-group:first-child { border-top: 0; padding-top: 0; }
+        .confirm-svc-group:last-child { padding-bottom: 0; }
+        .confirm-svc-head {
+            margin-bottom: 8px;
+            text-align: left;
+        }
+        .confirm-svc-name {
+            font-size: 13px; font-weight: 600;
+            color: #f3f4f6;
+            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        }
+        .confirm-svc-inline-count {
+            margin-left: 6px;
+            font-weight: 500;
+            color: #9ca3af;
+            font-family: -apple-system, sans-serif;
+        }
+        .confirm-svc-subgroup {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            gap: 8px;
+            align-items: start;
+            margin-bottom: 6px;
+            text-align: left;
+        }
+        .confirm-svc-subgroup:last-child { margin-bottom: 0; }
+        .confirm-svc-subgroup-label {
+            font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+            color: #6b7280; font-weight: 600;
+            padding-top: 4px;
+        }
+        .confirm-svc-hosts {
+            display: flex; flex-wrap: wrap; gap: 4px;
+        }
+        .confirm-flag-row {
+            display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .modal-sub > .confirm-flag-row:first-child { margin-top: 0; }
+        .confirm-flag {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 12px;
+            border-radius: 14px;
+            font-size: 12px;
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            color: #c7d2fe;
+        }
+        .confirm-flag.muted {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+            color: #9ca3af;
+        }
+        .confirm-actions { justify-content: center; gap: 10px; }
+        .confirm-actions .btn { min-width: 110px; justify-content: center; }
+        .btn-warn    { background: rgba(234, 179, 8, 0.15); color: #fde68a; border-color: rgba(234, 179, 8, 0.4); }
+        .btn-warn:hover:not(:disabled)    { background: rgba(234, 179, 8, 0.25); }
+        .btn-success { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4); }
+        .btn-success:hover:not(:disabled) { background: rgba(16, 185, 129, 0.25); }
 
         /* ============ MICROSERVICES ============ */
         .ms-tabs {
@@ -303,29 +428,797 @@
             border-color: rgba(99, 102, 241, 0.4);
             color: #c7d2fe; font-weight: 600;
         }
+        .ms-main {
+            display: flex; gap: 14px; align-items: flex-start;
+            max-width: 1400px;
+        }
+        .ms-content { flex: 0 0 auto; }
+        .ms-console-wrap {
+            flex: 1 1 auto; min-width: 320px;
+            display: flex; flex-direction: column;
+            background: #0a0f1d;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .ms-console-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(17, 24, 39, 0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .ms-console-title {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+            color: #9ca3af; font-weight: 600;
+        }
+        .ms-console-clear {
+            background: none; border: 0; cursor: pointer;
+            font-size: 11px; color: #6b7280; font-family: inherit;
+            padding: 2px 8px; border-radius: 4px;
+        }
+        .ms-console-clear:hover { color: #fca5a5; background: rgba(239,68,68,0.08); }
+        .ms-console {
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 10px 12px;
+            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+            font-size: 12px; line-height: 1.55;
+            color: #cbd5e1;
+            overflow-y: auto;
+            white-space: pre-wrap; word-break: break-word;
+        }
+        .ms-console-line { display: block; }
+        .ms-console-line .ts { color: #6b7280; margin-right: 8px; }
+        .ms-console-line .user { color: #a5b4fc; margin-right: 8px; font-weight: 600; }
+        .ms-console-line.info .msg { color: #cbd5e1; }
+        .ms-console-line.ok   .msg { color: #6ee7b7; }
+        .ms-console-line.warn .msg { color: #fde68a; }
+        .ms-console-line.err  .msg { color: #fca5a5; }
+        .ms-console-empty { color: #4b5563; font-style: italic; }
         .ms-group { margin-bottom: 22px; }
         .ms-group:last-child { margin-bottom: 0; }
         .ms-group-title {
             font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
             color: #6b7280; font-weight: 600; margin-bottom: 8px;
         }
-        .ms-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 8px;
+        .ms-group-title-row {
+            display: flex; align-items: center; justify-content: space-between;
+            max-width: 720px; margin-bottom: 8px; gap: 12px;
         }
-        .ms-node {
+        .ms-group-title-left {
             display: flex; align-items: center; gap: 10px;
+        }
+        .ms-group-actions {
+            display: flex; align-items: center; gap: 12px;
+        }
+        .ms-add-btn {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 10px;
+            background: rgba(99, 102, 241, 0.12);
+            color: #c7d2fe;
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            border-radius: 14px;
+            font-size: 11px; font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .ms-add-btn:hover { background: rgba(99, 102, 241, 0.22); color: #fff; border-color: rgba(99, 102, 241, 0.55); }
+        .ms-add-btn span { font-size: 14px; line-height: 1; font-weight: 700; }
+        .ms-empty-row {
+            text-align: center; color: #6b7280; font-size: 12px; font-style: italic;
+            padding: 14px;
+        }
+
+        /* === Microservices: control bar === */
+        .svc-controls {
+            display: flex; flex-direction: column; gap: 4px;
+            margin-bottom: 10px;
+            padding: 6px 10px;
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            max-width: 540px;
+        }
+        .svc-controls-row {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        }
+        .svc-controls-buttons { gap: 6px; }
+        .svc-controls .ms-action-btn { padding: 4px 10px; font-size: 12px; }
+        .svc-controls-spacer { flex: 1; }
+        .svc-controls-counter {
+            font-size: 12px; color: #6b7280;
+            padding: 0 8px;
+            border-left: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .svc-controls-counter strong { color: #c7d2fe; font-weight: 600; }
+        .svc-tool-btn {
+            padding: 3px 10px;
+            background: rgba(255, 255, 255, 0.04);
+            color: #cbd5e1;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            font-size: 11px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .svc-tool-btn:hover:not(:disabled) {
+            background: rgba(99, 102, 241, 0.15);
+            color: #c7d2fe;
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+        .svc-tool-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        .svc-clear-btn {
+            padding: 3px 10px;
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 6px;
+            font-size: 11px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .svc-clear-btn:hover:not(:disabled) {
+            background: rgba(239, 68, 68, 0.18);
+            color: #fff;
+            border-color: rgba(239, 68, 68, 0.55);
+        }
+        .svc-clear-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* === Microservices: sidebar (services) + main (hosts) + console === */
+        .svc-layout {
+            display: flex; gap: 14px;
+            max-width: 1500px;
+            align-items: stretch;
+        }
+        .svc-sidebar {
+            flex: 0 0 360px;
+            display: flex; flex-direction: column;
+            background: linear-gradient(180deg, rgba(17, 24, 39, 0.85), rgba(17, 24, 39, 0.55));
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 6px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04);
+        }
+        .svc-sidebar-head {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 8px;
+            padding: 4px 6px 6px;
+            margin-bottom: 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .svc-sidebar-legend {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #6b7280;
+            white-space: nowrap;
+        }
+        .svc-sidebar-legend .svc-no-balance-icon { width: 13px; height: 13px; }
+        .svc-sidebar-selectall {
+            display: inline-flex; align-items: center; gap: 6px;
+            cursor: pointer;
+            color: #cbd5e1;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            user-select: none;
+        }
+        .svc-sidebar-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3px 6px;
+        }
+        .svc-list-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 0 0 0 8px;
+            border-radius: 8px;
+            transition: background 0.12s, border-color 0.12s;
+            border: 1px solid transparent;
+        }
+        .svc-list-row:hover { background: rgba(255, 255, 255, 0.04); }
+        .svc-list-row.active {
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.22), rgba(99, 102, 241, 0.06));
+            border-color: rgba(99, 102, 241, 0.45);
+        }
+        .svc-list-row.active .svc-list-item { color: #fff; font-weight: 600; }
+        .svc-list-item {
+            flex: 1 1 auto;
+            display: flex; align-items: center; gap: 8px;
+            padding: 7px 10px 7px 6px;
+            background: transparent;
+            color: #cbd5e1;
+            border: 0;
+            font-size: 13px;
+            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+            cursor: pointer;
+            text-align: left;
+            overflow: hidden;
+        }
+        .svc-list-item > .svc-list-text {
+            display: flex; align-items: center; gap: 5px; min-width: 0; flex: 1 1 auto;
+        }
+        .svc-list-item .svc-list-name {
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            min-width: 0;
+        }
+        .svc-no-balance-icon {
+            width: 14px; height: 14px;
+            color: #9ca3af;
+            flex-shrink: 0;
+        }
+        .svc-list-row.active .svc-no-balance-icon { color: #c7d2fe; }
+
+        /* === Каталог микросервисов === */
+        .ms-cat-table {
+            width: 100%; max-width: 1200px;
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            overflow: hidden;
+            border-collapse: separate; border-spacing: 0;
+        }
+        .ms-cat-table th, .ms-cat-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 13px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        .ms-cat-table th {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+            color: #6b7280; font-weight: 600;
+            background: rgba(0,0,0,0.2);
+        }
+        .ms-cat-table tr:last-child td { border-bottom: 0; }
+        .ms-cat-table tr:hover td { background: rgba(255, 255, 255, 0.025); }
+        .ms-cat-name { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; color: #f3f4f6; font-weight: 500; }
+        .ms-cat-paths { display: flex; flex-direction: column; gap: 2px; max-width: 380px; }
+        .ms-cat-path { font-family: ui-monospace, monospace; font-size: 11px; color: #9ca3af; word-break: break-all; }
+        .ms-cat-paths-empty { color: #6b7280; font-style: italic; font-size: 11px; }
+        .ms-cat-node-pills { display: flex; flex-wrap: wrap; gap: 3px; max-width: 380px; }
+        .ms-cat-node-pill {
+            display: inline-block;
+            padding: 2px 7px;
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.28);
+            border-radius: 10px;
+            color: #c7d2fe;
+            font-size: 10px;
+            font-family: ui-monospace, monospace;
+        }
+        .ms-cat-actions { white-space: nowrap; text-align: right; }
+        .ms-cat-actions .icon-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #9ca3af;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-left: 4px;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .ms-cat-actions .icon-btn:hover { background: rgba(99,102,241,0.15); color: #c7d2fe; border-color: rgba(99,102,241,0.4); }
+        .ms-cat-actions .icon-btn.danger:hover { background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.4); }
+        .ms-cat-actions .icon-btn svg { width: 14px; height: 14px; }
+        .ms-cat-balanced { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; }
+        .ms-cat-balanced.yes { color: #6ee7b7; }
+        .ms-cat-balanced.no { color: #6b7280; }
+        .ms-role-badge {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .ms-role-badge.master { background: rgba(99,102,241,0.2); color: #c7d2fe; border: 1px solid rgba(99,102,241,0.5); }
+        .ms-role-badge.slave  { background: rgba(255,255,255,0.05); color: #9ca3af; border: 1px solid rgba(255,255,255,0.15); }
+
+        .role-picker {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+            margin-top: 2px;
+        }
+        .role-pick {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 6px;
+            padding: 14px 10px;
+            background: rgba(255, 255, 255, 0.03);
+            color: #cbd5e1;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px; font-weight: 600;
+            transition: background 0.12s, color 0.12s, border-color 0.12s, transform 0.08s;
+            position: relative;
+        }
+        .role-pick:hover:not(:disabled):not(.selected) {
+            background: rgba(255, 255, 255, 0.06);
+            color: #f3f4f6;
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+        .role-pick svg { width: 22px; height: 22px; }
+        .role-pick.selected {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(99, 102, 241, 0.18));
+            color: #fff;
+            border-color: rgba(99, 102, 241, 0.7);
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25), inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+        .role-pick.selected::after {
+            content: '✓';
+            position: absolute; top: 6px; right: 8px;
+            font-size: 11px; color: #c7d2fe; font-weight: 700;
+        }
+        .role-pick:disabled {
+            opacity: 0.4; cursor: not-allowed;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .role-pick:disabled .role-pick-label::after {
+            content: ' (занят)';
+            font-size: 10px;
+            color: #6b7280;
+            font-weight: 400;
+        }
+
+        #nodesCatalogArea .ms-cat-table { max-width: 640px; }
+        #nodesCatalogArea .ms-cat-table th, #nodesCatalogArea .ms-cat-table td { padding: 7px 10px; font-size: 12px; }
+        #nodesCatalogArea .ms-cat-table th:nth-child(1), #nodesCatalogArea .ms-cat-table td:nth-child(1) { width: 130px; }
+        #nodesCatalogArea .ms-cat-table th:nth-child(2), #nodesCatalogArea .ms-cat-table td:nth-child(2) { text-align: center; }
+        #nodesCatalogArea .ms-cat-table th:nth-child(3), #nodesCatalogArea .ms-cat-table td:nth-child(3) { width: 90px; text-align: center; }
+        #nodesCatalogArea .ms-cat-table th:nth-child(4), #nodesCatalogArea .ms-cat-table td:nth-child(4) { width: 44px; }
+        #nodesCatalogArea .ms-cat-table .ms-cat-path { font-size: 11px; }
+
+        .ms-cat-nodes-grid {
+            display: flex; flex-direction: column; gap: 10px;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            padding: 10px;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .ms-cat-group {
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+        .ms-cat-group-head {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .ms-cat-group-name {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+            color: #f3f4f6; font-weight: 700;
+        }
+        .ms-cat-group-count {
+            font-size: 11px; color: #6b7280; font-family: ui-monospace, monospace;
+            margin-left: 4px;
+        }
+        .ms-cat-group-allbtn {
+            margin-left: auto;
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 12px;
+            border-radius: 14px;
+            cursor: pointer;
+            font-size: 10px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            font-family: inherit;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .ms-cat-group-allbtn svg { width: 12px; height: 12px; stroke-width: 2.5; }
+        .ms-cat-group-allbtn[data-state="none"] {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #9ca3af;
+        }
+        .ms-cat-group-allbtn[data-state="none"]:hover {
+            background: rgba(99,102,241,0.12); color: #c7d2fe; border-color: rgba(99,102,241,0.4);
+        }
+        .ms-cat-group-allbtn[data-state="some"] {
+            background: rgba(99,102,241,0.18);
+            border: 1px solid rgba(99,102,241,0.5);
+            color: #c7d2fe;
+        }
+        .ms-cat-group-allbtn[data-state="some"]:hover {
+            background: rgba(99,102,241,0.28); color: #fff;
+        }
+        .ms-cat-group-allbtn[data-state="all"] {
+            background: rgba(239, 68, 68, 0.18);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #fca5a5;
+        }
+        .ms-cat-group-allbtn[data-state="all"]:hover {
+            background: rgba(239, 68, 68, 0.32);
+            border-color: rgba(239, 68, 68, 0.7);
+            color: #fff;
+        }
+        .ms-cat-group-allbtn .label-clear { display: none; }
+        .ms-cat-group-allbtn[data-state="all"] .label-default { display: none; }
+        .ms-cat-group-allbtn[data-state="all"] .label-clear { display: inline; }
+        .ms-cat-group-allbtn .icon-x { display: none; }
+        .ms-cat-group-allbtn[data-state="all"] .icon-check { display: none; }
+        .ms-cat-group-allbtn[data-state="all"] .icon-x { display: inline; }
+        .ms-cat-pills {
+            display: flex; flex-wrap: wrap; gap: 4px;
+        }
+        .ms-cat-pill {
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            color: #9ca3af;
+            font-size: 11px;
+            font-family: ui-monospace, monospace;
+            cursor: pointer;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .ms-cat-pill:hover { background: rgba(255, 255, 255, 0.06); color: #f3f4f6; }
+        .ms-cat-pill.checked {
+            background: rgba(99, 102, 241, 0.2);
+            color: #fff;
+            border-color: rgba(99, 102, 241, 0.55);
+            font-weight: 600;
+        }
+        .ms-cat-pill.checked:hover { background: rgba(99, 102, 241, 0.3); }
+        .svc-list-item::before {
+            content: '';
+            width: 6px; height: 6px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.15);
+            flex-shrink: 0;
+        }
+        .svc-list-row.active .svc-list-item::before {
+            background: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+            transform: scale(1.2);
+        }
+        .svc-list-row:hover .svc-list-item::before { background: rgba(99, 102, 241, 0.6); }
+        .svc-list-row.ok .svc-list-item::before {
+            background: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+        }
+        .svc-list-row.warn .svc-list-item::before {
+            background: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25);
+        }
+        .svc-list-row.bad .svc-list-item::before {
+            background: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+        }
+        .svc-list-row.ok.active .svc-list-item::before,
+        .svc-list-row.warn.active .svc-list-item::before,
+        .svc-list-row.bad.active .svc-list-item::before {
+            transform: scale(1.2);
+        }
+        .svc-content {
+            flex: 0 0 410px;
+            min-width: 0;
+            background: rgba(17, 24, 39, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
+            padding: 18px 20px;
+            align-self: flex-start;
+        }
+        .svc-console-box {
+            flex: 0 0 380px;
+            min-width: 280px;
+            display: flex; flex-direction: column;
+            background: #0a0f1d;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            overflow: hidden;
+            min-height: 360px;
+        }
+        .svc-console-half {
+            display: flex; flex-direction: column;
+            flex: 1 1 50%;
+            min-height: 0;
+        }
+        .svc-console-errors-half { border-top: 2px solid rgba(239, 68, 68, 0.2); }
+
+        .svc-run-banner {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, rgba(234, 179, 8, 0.18), rgba(234, 179, 8, 0.06));
+            border: 1px solid rgba(234, 179, 8, 0.45);
+            border-radius: 10px;
+            color: #fde68a;
+            font-size: 13px;
+            max-width: 1200px;
+        }
+        .svc-run-banner-lock { font-size: 16px; }
+        .svc-run-banner-text { flex: 1; }
+        .svc-run-banner strong { color: #fff; font-weight: 700; }
+        .svc-console-box .ms-console-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(17, 24, 39, 0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .svc-console-box .ms-console {
+            flex: 1 1 auto; min-height: 0;
+            padding: 10px 12px;
+            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+            font-size: 12px; line-height: 1.55;
+            color: #cbd5e1;
+            overflow-y: auto;
+            white-space: pre-wrap; word-break: break-word;
+        }
+        .svc-content-title {
+            font-size: 18px; font-weight: 600; color: #f3f4f6;
+            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+            margin-bottom: 14px;
+        }
+        .svc-host-group { margin-bottom: 16px; }
+        .svc-host-group:last-child { margin-bottom: 0; }
+        .svc-host-group-title {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+            color: #6b7280; font-weight: 600; margin-bottom: 6px;
+            padding-left: 4px;
+        }
+        .svc-host-list {
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .svc-host-header {
+            display: grid;
+            grid-template-columns: 22px 86px 48px 75px 110px;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px 6px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6b7280;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            margin-bottom: 4px;
+        }
+        .svc-host-header .col-version,
+        .svc-host-header .col-rotation,
+        .svc-host-header .col-status { text-align: center; }
+        .svc-host-pill .svc-host-rotation {
+            font-size: 12px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .svc-host-pill .svc-host-rotation.in   { color: #6ee7b7; }
+        .svc-host-pill .svc-host-rotation.out  { color: #fca5a5; }
+        .svc-host-pill .svc-host-rotation.empty { color: #6b7280; font-weight: 400; }
+        .svc-host-pill {
+            display: grid;
+            grid-template-columns: 22px 86px 48px 75px 110px;
+            align-items: center;
+            gap: 5px;
+            padding: 7px 10px;
+            background: rgba(17, 24, 39, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            color: #f3f4f6;
+            font-size: 13px;
+            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        }
+        .svc-host-pill > span:nth-child(2) {
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+        }
+        .svc-host-pill .svc-host-version {
+            font-size: 12px;
+            color: #cbd5e1;
+            text-align: center;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .svc-host-pill .svc-host-version.empty { color: #6b7280; }
+        .svc-host-pill .svc-host-status {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        .svc-empty {
+            padding: 30px;
+            text-align: center;
+            color: #6b7280; font-size: 13px;
+            background: rgba(17, 24, 39, 0.4);
+            border-radius: 10px;
+            border: 1px dashed rgba(255, 255, 255, 0.08);
+        }
+        .ms-group-title-row .ms-group-title { margin-bottom: 0; }
+        .ms-poll-indicator {
+            font-size: 11px; color: #9ca3af; white-space: nowrap;
+        }
+        .ms-poll-indicator #msPollTime { color: #cbd5e1; font-variant-numeric: tabular-nums; }
+        .ms-table {
+            width: 100%; max-width: 720px;
+            table-layout: fixed;
+            border-collapse: separate; border-spacing: 0;
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px; overflow: hidden;
+        }
+        .ms-table th, .ms-table td {
+            padding: 8px 14px; text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 13px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ms-table th:nth-child(1), .ms-table td:nth-child(1) { width: 38px; text-align: center; padding-left: 12px; padding-right: 6px; }
+        .ms-table th:nth-child(2), .ms-table td:nth-child(2) { width: 28%; text-align: left; }
+        .ms-table th:nth-child(3), .ms-table td:nth-child(3) { width: 56%; text-align: center; }
+        .ms-table th:nth-child(4), .ms-table td:nth-child(4) { width: 16%; text-align: center; padding-left: 4px; padding-right: 12px; }
+        .ms-edit-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px;
+            background: rgba(255, 255, 255, 0.04);
+            color: #9ca3af;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .ms-edit-btn:hover {
+            background: rgba(99, 102, 241, 0.15);
+            color: #c7d2fe;
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+        .ms-edit-btn svg { width: 14px; height: 14px; stroke-width: 2; }
+        .ms-controls {
+            display: flex;
+            gap: 10px;
+            align-items: stretch;
+            margin-bottom: 14px;
+            max-width: 1080px;
+            min-height: 200px;
+        }
+        .ms-selection {
+            display: flex;
+            flex: 1 1 auto;
+            min-width: 0;
+            flex-direction: column;
+            gap: 6px;
             padding: 10px 14px;
             background: rgba(17, 24, 39, 0.6);
             border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 10px;
-            font-size: 13px; color: #f3f4f6;
+            max-width: 720px;
+            min-height: 200px;
+        }
+        .ms-actions {
+            display: flex; flex-direction: column; gap: 8px;
+            flex-shrink: 0;
+            padding: 10px 14px;
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            min-height: 200px;
+            justify-content: center;
+        }
+        .ms-action-btn {
+            padding: 6px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: #f3f4f6;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: background 0.12s, border-color 0.12s, color 0.12s;
+        }
+        .ms-action-btn:hover { background: rgba(255, 255, 255, 0.08); }
+        .ms-action-btn.stop:hover    { background: rgba(239, 68, 68, 0.15);   border-color: rgba(239, 68, 68, 0.4);   color: #fca5a5; }
+        .ms-action-btn.restart:hover { background: rgba(234, 179, 8, 0.15);   border-color: rgba(234, 179, 8, 0.4);   color: #fde68a; }
+        .ms-action-btn.start:hover   { background: rgba(16, 185, 129, 0.15);  border-color: rgba(16, 185, 129, 0.4);  color: #6ee7b7; }
+        .ms-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .ms-sel-group {
+            display: flex; align-items: center; gap: 6px;
+            flex-wrap: wrap;
+        }
+        .ms-sel-group-label {
+            flex-shrink: 0; width: 100px;
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+            color: #6b7280; font-weight: 600;
+        }
+        .ms-selection.visible { display: flex; }
+        .ms-selection-counter {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 3px 10px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            border-radius: 20px;
+            font-size: 12px; font-weight: 600;
+            color: #c7d2fe;
+            margin-right: 4px;
+        }
+        .ms-selection-counter.empty {
+            background: rgba(255,255,255,0.04);
+            border-color: rgba(255,255,255,0.12);
+            color: #6b7280;
+        }
+        .ms-selection-counter svg { width: 12px; height: 12px; stroke-width: 2.5; }
+        .ms-selection-empty { font-size: 12px; color: #6b7280; }
+        .ms-selection-clear {
+            margin-left: auto;
+            background: none; border: 0; cursor: pointer;
+            font-size: 12px; color: #9ca3af; font-family: inherit;
+            padding: 4px 8px; border-radius: 6px;
+        }
+        .ms-selection-clear:hover { color: #fca5a5; background: rgba(239,68,68,0.08); }
+        .ms-pill {
+            display: inline-flex; align-items: center;
+            padding: 3px 9px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            border-radius: 6px;
+            font-size: 12px; color: #c7d2fe;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         }
+        .ms-checkbox {
+            appearance: none; -webkit-appearance: none;
+            width: 16px; height: 16px;
+            border: 1.5px solid rgba(255,255,255,0.22);
+            border-radius: 4px;
+            background: rgba(255,255,255,0.04);
+            cursor: pointer; vertical-align: middle;
+            position: relative; flex-shrink: 0;
+            transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+        }
+        .ms-checkbox:hover {
+            border-color: rgba(99,102,241,0.6);
+            background: rgba(99,102,241,0.10);
+        }
+        .ms-checkbox:checked {
+            background: #6366f1;
+            border-color: #6366f1;
+            box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35);
+        }
+        .ms-checkbox:checked::after {
+            content: ''; position: absolute;
+            left: 4px; top: 0px;
+            width: 5px; height: 9px;
+            border: solid #fff; border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        .ms-checkbox:indeterminate {
+            background: #6366f1;
+            border-color: #6366f1;
+            box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35);
+        }
+        .ms-checkbox:indeterminate::after {
+            content: ''; position: absolute;
+            left: 3px; top: 6px;
+            width: 7px; height: 2px;
+            background: #fff; border-radius: 1px;
+        }
+        .ms-checkbox:focus-visible {
+            outline: 2px solid rgba(99,102,241,0.55);
+            outline-offset: 2px;
+        }
+        .ms-table tr:last-child td { border-bottom: 0; }
+        .ms-table th {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+            color: #6b7280; font-weight: 600;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .ms-table td.host {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            color: #f3f4f6;
+        }
+        .ms-table td.ver, .ms-table td.st { color: #cbd5e1; }
+        .ms-status { display: inline-flex; align-items: center; gap: 8px; }
         .ms-node-dot {
             width: 8px; height: 8px; border-radius: 50%;
             background: #6b7280; flex-shrink: 0;
         }
+        .ms-node-dot.ok { background: #34d399; }
+        .ms-node-dot.err { background: #fca5a5; }
 
         /* ============ DB CONNECTION FORM ============ */
         .db-list { display: flex; flex-direction: column; gap: 18px; max-width: 720px; }
@@ -676,17 +1569,73 @@
             </section>
 
             <!-- MICROSERVICES -->
-            <section data-route="microservices">
-                <div class="page-header">
-                    <div>
-                        <h1 class="page-title">Микросервисы</h1>
+            <section data-route="services">
+                <div class="ms-controls">
+                    <div class="ms-selection" id="msSelection"></div>
+                    <div class="ms-actions">
+                        <button class="ms-action-btn stop" onclick="msAction('stop')">Выключить Inceptum</button>
+                        <button class="ms-action-btn start" onclick="msAction('start')">Включить Inceptum</button>
+                        <button class="ms-action-btn restart" onclick="msAction('restart')">Перезагрузить Inceptum</button>
                     </div>
                 </div>
-                <div class="ms-tabs" id="msTabs"></div>
-                <div class="ms-content" id="msContent"></div>
+                <div class="ms-main">
+                    <div class="ms-content" id="msContent"></div>
+                    <div class="ms-console-wrap">
+                        <div class="ms-console-header">
+                            <span class="ms-console-title">Консоль</span>
+                        </div>
+                        <div class="ms-console" id="msConsole"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MICROSERVICES (host → list of services) -->
+            <section data-route="microservices">
+                <div id="msListRoot"></div>
             </section>
 
             <!-- DB CONNECTION -->
+            <!-- MICROSERVICES CATALOG (admin) -->
+            <section data-route="ms_catalog">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Каталог микросервисов</h1>
+                        <div class="page-sub">Имя, файлы балансировщика и список нод по каждому микросервису</div>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="openMsCatalogEditor(null)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Добавить
+                    </button>
+                </div>
+                <div id="msCatalogArea"><div class="muted">Загрузка…</div></div>
+            </section>
+
+            <!-- NODES CATALOG (admin) -->
+            <section data-route="nodes_catalog">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Каталог нод для микросервисов</h1>
+                        <div class="page-sub">Список нод, которые можно назначить микросервисам в «Каталоге микросервисов» (тот, в свою очередь, питает вкладку «Микросервисы»)</div>
+                        <button type="button" class="btn btn-primary" onclick="openMsGroupCreator()" style="margin-top:12px">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Добавить плечо
+                        </button>
+                    </div>
+                </div>
+                <div id="nodesCatalogArea"><div class="muted">Загрузка…</div></div>
+            </section>
+
+            <!-- BALANCER CREDS (admin) -->
+            <section data-route="balancer_creds">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Учётки для балансировки</h1>
+                        <div class="page-sub">SSH к балансировщику nginx и NTLM-учётка для Inceptum API (старт/стоп/статус микросервисов)</div>
+                    </div>
+                </div>
+                <div id="balancerCredsArea"><div class="muted">Загрузка…</div></div>
+            </section>
+
             <section data-route="db_connection">
                 <div class="page-header">
                     <div>
@@ -742,6 +1691,130 @@
         </div>
     </div>
 
+    <!-- MS GROUP CREATE MODAL -->
+    <div class="modal-backdrop" id="msGroupBackdrop" onclick="if(event.target===this) closeMsGroupCreator()">
+        <div class="modal" style="max-width: 420px">
+            <div class="modal-title">Новое плечо</div>
+            <div class="modal-sub">Ключ латиницей и понятное название для UI</div>
+            <form onsubmit="return saveMsGroup(event)">
+                <div class="field">
+                    <label for="msGroupKey">Ключ</label>
+                    <input type="text" id="msGroupKey" autocomplete="off" spellcheck="false" required maxlength="32"
+                           placeholder="например: itl3"
+                           oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9_-]/g, '')">
+                    <div class="field-hint">Маленькая латиница, цифры, дефис, подчёркивание (до 32 символов)</div>
+                </div>
+                <div class="field">
+                    <label for="msGroupTitle">Название</label>
+                    <input type="text" id="msGroupTitle" autocomplete="off" spellcheck="false" required maxlength="64"
+                           placeholder="например: ITL 3 плечо">
+                    <div class="field-hint">Видимое название плеча</div>
+                </div>
+                <div class="modal-error" id="msGroupError"></div>
+                <div class="modal-actions" style="justify-content:flex-end; gap:8px">
+                    <button type="button" class="btn btn-ghost" onclick="closeMsGroupCreator()" style="min-width:130px;justify-content:center">Отмена</button>
+                    <button type="submit" class="btn btn-primary" style="min-width:130px;justify-content:center">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MS CATALOG EDITOR MODAL -->
+    <div class="modal-backdrop" id="msCatBackdrop" onclick="if(event.target===this) closeMsCatalogEditor()">
+        <div class="modal" style="max-width: 640px">
+            <div class="modal-title" id="msCatTitle">Новый микросервис</div>
+            <div class="modal-sub" id="msCatSub">Имя, пути nginx-конфигов и список нод</div>
+            <form id="msCatForm" onsubmit="return saveMsCatalog(event)">
+                <div class="field">
+                    <label for="msCatName">Имя микросервиса</label>
+                    <input type="text" id="msCatName" autocomplete="off" spellcheck="false" required maxlength="128"
+                           oninput="this.value = this.value.replace(/[^A-Za-z0-9._-]/g, '')">
+                    <div class="field-hint">Латиница, цифры, точка, дефис, подчёркивание (до 128 символов)</div>
+                </div>
+                <div class="field">
+                    <label for="msCatPaths">Пути nginx-конфигов балансировщика (по одному на строку)</label>
+                    <textarea id="msCatPaths" rows="3" autocomplete="off" spellcheck="false"
+                              style="width:100%;padding:10px 12px;font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,255,255,0.04);color:#f3f4f6;border:1px solid rgba(255,255,255,0.1);border-radius:9px;outline:none;resize:vertical"
+                              placeholder="/etc/nginx/conf.d/prod.example.conf"></textarea>
+                    <div class="field-hint">Пусто — сервис не балансируется. По одному пути на строку. Допустимы /, латиница, цифры, точка, дефис, подчёркивание.</div>
+                </div>
+                <div class="field">
+                    <label>Ноды, на которых запускается сервис</label>
+                    <div id="msCatNodesGrid" class="ms-cat-nodes-grid"></div>
+                </div>
+                <div class="modal-error" id="msCatError"></div>
+                <div class="modal-actions" style="justify-content: space-between">
+                    <button type="button" class="btn btn-danger" id="msCatDeleteBtn" onclick="deleteMsCatalog()" style="display:none">Удалить</button>
+                    <div style="display:flex;gap:8px;margin-left:auto">
+                        <button type="button" class="btn btn-ghost" onclick="closeMsCatalogEditor()">Отмена</button>
+                        <button type="submit" class="btn btn-primary" id="msCatSubmitBtn">Сохранить</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MS NODE EDITOR MODAL -->
+    <div class="modal-backdrop" id="msNodeBackdrop" onclick="if(event.target===this) closeMsNodeEditor()">
+        <div class="modal" style="max-width: 480px">
+            <div class="modal-title" id="msNodeModalTitle">Настройки ноды <span id="msNodeKey" style="color:#c7d2fe;font-family:ui-monospace,monospace;font-weight:500"></span></div>
+            <div class="modal-sub" id="msNodeModalSub">Можно переопределить адрес и имя опрашиваемой службы</div>
+            <form id="msNodeForm" onsubmit="return saveMsNode(event)">
+                <div class="field" id="msNodeKeyField" style="display:none">
+                    <label for="msNodeKeyInput">Ключ (имя в таблице)</label>
+                    <input type="text" id="msNodeKeyInput" autocomplete="off" spellcheck="false" placeholder="" required maxlength="64"
+                           oninput="this.value = this.value.replace(/[^A-Za-z0-9._-]/g, '')">
+                    <div class="field-hint">Латиница, цифры, точка, дефис, подчёркивание (до 64 символов)</div>
+                </div>
+                <div class="field">
+                    <label for="msNodeHost">Хост (DNS или IP)</label>
+                    <input type="text" id="msNodeHost" autocomplete="off" spellcheck="false" placeholder="" required maxlength="253"
+                           oninput="this.value = this.value.replace(/[^A-Za-z0-9.:_-]/g, '')">
+                    <div class="field-hint" id="msNodeHostHint"></div>
+                </div>
+                <input type="hidden" id="msNodeService" value="">
+                <div class="field-hint" id="msNodeServiceHint" style="display:none"></div>
+                <div class="field">
+                    <label>Роль</label>
+                    <div class="role-picker" id="msNodeRolePicker">
+                        <button type="button" class="role-pick" data-role="master" onclick="setNodeRole('master')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 17l4-10 4 6 2-8 2 8 4-6 4 10z"/><line x1="2" y1="22" x2="22" y2="22"/></svg>
+                            <span class="role-pick-label">Master</span>
+                        </button>
+                        <button type="button" class="role-pick" data-role="slave" onclick="setNodeRole('slave')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                            <span class="role-pick-label">Slave</span>
+                        </button>
+                    </div>
+                    <input type="hidden" id="msNodeRole" value="">
+                    <div class="field-hint" id="msNodeRoleHint">В каждой группе может быть только один Master</div>
+                </div>
+                <div class="modal-error" id="msNodeError"></div>
+                <div class="modal-actions" style="justify-content: space-between; gap:8px">
+                    <button type="button" class="btn btn-danger" id="msNodeDeleteBtn" onclick="deleteMsNode()">Удалить хост</button>
+                    <div style="display:flex; gap:8px; margin-left:auto">
+                        <button type="button" class="btn btn-ghost" onclick="closeMsNodeEditor()" style="min-width:140px; justify-content:center">Отмена</button>
+                        <button type="submit" class="btn btn-primary" id="msNodeSubmitBtn" style="min-width:140px; justify-content:center">Сохранить</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- CONFIRM MODAL -->
+    <div class="modal-backdrop" id="confirmBackdrop" onclick="if(event.target===this) confirmModalResolve(false)">
+        <div class="modal modal-confirm">
+            <div class="confirm-icon" id="confirmIcon"></div>
+            <div class="modal-title" id="confirmTitle">Подтвердите действие</div>
+            <div class="modal-sub" id="confirmSub"></div>
+            <div class="confirm-nodes" id="confirmNodes"></div>
+            <div class="modal-actions confirm-actions">
+                <button type="button" class="btn btn-ghost" onclick="confirmModalResolve(false)">Отмена</button>
+                <button type="button" class="btn" id="confirmOk" onclick="confirmModalResolve(true)">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast-stack" id="toastStack"></div>
 
     <script>
@@ -749,12 +1822,111 @@
         const ICONS = {
             users:         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
             operations:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
-            microservices: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+            services:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+            microservices: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="20" cy="18" r="2"/></svg>',
             db_connection: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></svg>',
+            ms_catalog:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M4 14h6v6H4z"/><path d="M14 14h6v6h-6z"/></svg>',
+            nodes_catalog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><circle cx="7" cy="7" r="0.6" fill="currentColor"/><circle cx="7" cy="17" r="0.6" fill="currentColor"/></svg>',
+            balancer_creds:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4"/><path d="M18 5l4 4"/><path d="M15 8l4 4"/></svg>',
             about:         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
         };
         const GROUP_LABELS = { main: 'Основное', settings: 'Настройки' };
         const DEFAULT_ROUTE = 'operations';
+
+        const CONFIRM_ICONS = {
+            danger:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="12" height="14" rx="1.5"/><line x1="10" y1="9" x2="10" y2="15"/><line x1="14" y1="9" x2="14" y2="15"/></svg>',
+            warn:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+            success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+        };
+
+        let _confirmResolve = null;
+        function confirmModal({ title, message, nodes = [], groups = null, flags = [], kind = 'warn', confirmText = 'Подтвердить', confirmClass = 'btn-primary', compact = false }) {
+            return new Promise(resolve => {
+                if (_confirmResolve) _confirmResolve(false);
+                _confirmResolve = resolve;
+                const modal = document.querySelector('#confirmBackdrop .modal-confirm');
+                if (modal) modal.classList.toggle('compact', !!compact);
+                document.getElementById('confirmTitle').textContent = title;
+                const sub = document.getElementById('confirmSub');
+                sub.innerHTML = '';
+                if (message) sub.textContent = message;
+                if (flags && flags.length) {
+                    const row = document.createElement('div');
+                    row.className = 'confirm-flag-row';
+                    row.innerHTML = flags.map(f => `<span class="confirm-flag ${f.muted ? 'muted' : ''}">${escapeHtml(f.label)}</span>`).join('');
+                    sub.appendChild(row);
+                }
+                const nodesEl = document.getElementById('confirmNodes');
+                if (groups && groups.length) {
+                    nodesEl.innerHTML = groups.map(g => {
+                        const total = g.total ?? (g.subgroups
+                            ? g.subgroups.reduce((a, sg) => a + sg.hosts.length, 0)
+                            : (g.items?.length || 0));
+                        const body = g.subgroups
+                            ? g.subgroups.map(sg => `
+                                <div class="confirm-svc-subgroup">
+                                    <span class="confirm-svc-subgroup-label">${escapeHtml(sg.label)}</span>
+                                    <div class="confirm-svc-hosts">
+                                        ${sg.hosts.map(h => `<span class="confirm-node-pill">${escapeHtml(h)}</span>`).join('')}
+                                    </div>
+                                </div>
+                            `).join('')
+                            : `<div class="confirm-svc-hosts">${(g.items || []).map(it => `<span class="confirm-node-pill">${escapeHtml(it)}</span>`).join('')}</div>`;
+                        return `
+                            <div class="confirm-svc-group">
+                                <div class="confirm-svc-head">
+                                    <span class="confirm-svc-name">${escapeHtml(g.title)}<span class="confirm-svc-inline-count">(${total})</span></span>
+                                </div>
+                                ${body}
+                            </div>`;
+                    }).join('');
+                    nodesEl.style.display = 'flex';
+                } else if (nodes.length) {
+                    const set = new Set(nodes);
+                    const groupSrc = (typeof MS_GROUPS !== 'undefined') ? MS_GROUPS : [];
+                    const byGroup  = (typeof MS_NODES_BY_GROUP !== 'undefined') ? MS_NODES_BY_GROUP : {};
+                    const grouped = groupSrc
+                        .map(g => {
+                            const keys = (byGroup[g.key] || []).map(n => n.key).filter(k => set.has(k));
+                            return { title: g.title, nodes: keys };
+                        })
+                        .filter(g => g.nodes.length);
+                    if (grouped.length) {
+                        nodesEl.innerHTML = grouped.map(g =>
+                            `<div class="confirm-node-row">
+                                <span class="confirm-node-label">${escapeHtml(g.title)}</span>
+                                ${g.nodes.map(n => `<span class="confirm-node-pill">${escapeHtml(n)}</span>`).join('')}
+                            </div>`
+                        ).join('');
+                    } else {
+                        nodesEl.innerHTML = nodes.map(n => `<span class="confirm-node-pill">${escapeHtml(n)}</span>`).join('');
+                    }
+                    nodesEl.style.display = 'flex';
+                } else {
+                    nodesEl.style.display = 'none';
+                }
+                const icon = document.getElementById('confirmIcon');
+                icon.className = `confirm-icon ${kind}`;
+                icon.innerHTML = CONFIRM_ICONS[kind] || '';
+                const ok = document.getElementById('confirmOk');
+                ok.textContent = confirmText;
+                ok.className = `btn ${confirmClass}`;
+                document.getElementById('confirmBackdrop').classList.add('open');
+                setTimeout(() => ok.focus(), 30);
+            });
+        }
+        function confirmModalResolve(value) {
+            const r = _confirmResolve;
+            _confirmResolve = null;
+            document.getElementById('confirmBackdrop').classList.remove('open');
+            if (r) r(value);
+        }
+        window.confirmModalResolve = confirmModalResolve;
+        document.addEventListener('keydown', (e) => {
+            if (!_confirmResolve) return;
+            if (e.key === 'Escape') confirmModalResolve(false);
+            if (e.key === 'Enter')  confirmModalResolve(true);
+        });
 
         // ============ STATE ============
         const state = {
@@ -842,7 +2014,17 @@
             if (route === 'users' && state.me.role === 'admin') loadUsers();
             if (route === 'operations') resetOpResult();
             if (route === 'db_connection' && state.me.role === 'admin') loadDbSettings();
-            if (route === 'microservices') initMicroservices();
+            if (route === 'ms_catalog' && state.me.role === 'admin') loadMsCatalog();
+            if (route === 'nodes_catalog' && state.me.role === 'admin') loadNodesCatalog();
+            if (route === 'balancer_creds' && state.me.role === 'admin') loadBalancerCreds();
+            if (route === 'services') initMicroservices();
+            else {
+                if (msPollTimer)   { clearInterval(msPollTimer);  msPollTimer = null; }
+                if (msPollTimeout) { clearTimeout(msPollTimeout); msPollTimeout = null; }
+                msConsoleStopPolling();
+            }
+            if (route === 'microservices') renderMicroservicesList();
+            else { stopSvcPolling(); stopSvcAllHealthPoll(); stopSvcOrchPolling(); }
         }
 
         // ============ OPERATIONS LOOKUP ============
@@ -1028,52 +2210,1401 @@
         window.opLookup = opLookup;
 
         // ============ MICROSERVICES ============
+        const MS_SERVICE_NAME = 'Inceptum.AppServer.3.0';
+        const MS_POLL_INTERVAL_MS = 5000;
+        let msPollTimer = null;
+        let msPollTimeout = null;
+        let msAllNodes = [];
+        let msStatuses = {};   // {nodeKey: 'running'|'stopped'|'starting'|'stopping'|'unreachable'|'not_found'|'unknown'}
+        // Группы — фиксированный список (порядок и метки). Сами хосты приходят с бэка.
         const MS_GROUPS = [
-            {key: 'gate', title: 'GATE', nodes: [
-                'sr-itlgate101', 'sr-itlgate102', 'sr-itlgate103', 'sr-itlgate104',
+            {key: 'gate', title: 'GATE'},
+            {key: 'itl1', title: 'ITL 1 плечо'},
+            {key: 'itl2', title: 'ITL 2 плечо'},
+            {key: 'itlr', title: 'ITLR'},
+            {key: 'btl',  title: 'BTL'},
+        ];
+        let MS_NODES_BY_GROUP = {};
+        async function loadMsNodes() {
+            const resp = await fetch('/api/ms/nodes');
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            MS_NODES_BY_GROUP = {};
+            for (const g of MS_GROUPS) MS_NODES_BY_GROUP[g.key] = [];
+            for (const n of (data.nodes || [])) {
+                if (!MS_NODES_BY_GROUP[n.group]) MS_NODES_BY_GROUP[n.group] = [];
+                MS_NODES_BY_GROUP[n.group].push(n);
+            }
+        }
+
+        async function initMicroservices() {
+            const out = document.getElementById('msContent');
+            out.innerHTML = '<div style="padding:30px;color:#6b7280;font-size:13px">Загрузка нод…</div>';
+            try {
+                await loadMsNodes();
+            } catch (e) {
+                out.innerHTML = `<div style="padding:30px;color:#fca5a5;font-size:13px">Не удалось загрузить список нод: ${escapeHtml(e.message)}</div>`;
+                return;
+            }
+            renderMicroservices();
+            msUpdateSelection();
+            msConsoleLastId = 0;
+            msConsoleClear();
+            msConsoleLoad();
+            msConsoleStartPolling();
+            msStartPolling();
+            msSyncConsoleHeight();
+            msEnsureConsoleResizeObserver();
+        }
+
+        function renderMicroservices() {
+            const out = document.getElementById('msContent');
+            if (!out) return;
+            const rowHtml = (g, n) => `
+                <tr>
+                    <td><input type="checkbox" class="ms-checkbox" data-ms-group="${escapeHtml(g.key)}" data-ms-node="${escapeHtml(n.key)}" onchange="msSyncGroup('${escapeHtml(g.key)}')"></td>
+                    <td class="host">${escapeHtml(n.key)}</td>
+                    <td class="st" data-ms-status-cell="${escapeHtml(n.key)}"><span class="ms-status"><span class="ms-node-dot"></span>—</span></td>
+                    <td class="settings">
+                        <button type="button" class="ms-edit-btn" onclick="openMsNodeEditor('${escapeHtml(n.key)}')" title="Настройки ноды">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        </button>
+                    </td>
+                </tr>`;
+            const addBtn = (g) => `<button type="button" class="ms-add-btn" onclick="openMsNodeAdder('${escapeHtml(g.key)}')" title="Добавить хост в группу ${escapeHtml(g.title)}"><span>+</span> Хост</button>`;
+            const groupHtml = (g, idx) => {
+                const nodes = MS_NODES_BY_GROUP[g.key] || [];
+                const tbody = nodes.length
+                    ? nodes.map(n => rowHtml(g, n)).join('')
+                    : `<tr><td colspan="4" class="ms-empty-row">В группе нет хостов</td></tr>`;
+                const titleBlock = `
+                    <div class="ms-group-title-row">
+                        <div class="ms-group-title-left">
+                            <div class="ms-group-title">${escapeHtml(g.title)}</div>
+                            ${addBtn(g)}
+                        </div>
+                        ${idx === 0 ? `<div class="ms-poll-indicator">Опрошено: <span id="msPollTime">—</span></div>` : ''}
+                    </div>`;
+                return `
+                <div class="ms-group">
+                    ${titleBlock}
+                    <table class="ms-table">
+                        <thead><tr>
+                            <th><input type="checkbox" class="ms-checkbox" data-ms-group-all="${escapeHtml(g.key)}" onchange="msToggleGroup('${escapeHtml(g.key)}', this.checked)" title="Выделить всю группу"></th>
+                            <th>Хост</th><th>Статус службы Inceptum</th><th>Настройки</th>
+                        </tr></thead>
+                        <tbody>${tbody}</tbody>
+                    </table>
+                </div>`;
+            };
+            out.innerHTML = MS_GROUPS.map((g, i) => groupHtml(g, i)).join('');
+        }
+
+        let _msConsoleRO = null;
+        function msSyncConsoleHeight() {
+            const content = document.getElementById('msContent');
+            const wrap = document.querySelector('.ms-console-wrap');
+            if (!content || !wrap) return;
+            const tables = content.querySelectorAll('.ms-table');
+            if (!tables.length) return;
+            const contentTop = content.getBoundingClientRect().top;
+            const firstTop   = tables[0].getBoundingClientRect().top - contentTop;
+            const lastBottom = tables[tables.length - 1].getBoundingClientRect().bottom - contentTop;
+            const h = lastBottom - firstTop;
+            if (h > 0) {
+                wrap.style.marginTop = firstTop + 'px';
+                wrap.style.height = h + 'px';
+            }
+        }
+        function msEnsureConsoleResizeObserver() {
+            if (_msConsoleRO || typeof ResizeObserver === 'undefined') return;
+            const content = document.getElementById('msContent');
+            if (!content) return;
+            _msConsoleRO = new ResizeObserver(msSyncConsoleHeight);
+            _msConsoleRO.observe(content);
+            window.addEventListener('resize', msSyncConsoleHeight);
+        }
+
+        function msToggleGroup(groupKey, checked) {
+            document.querySelectorAll(`.ms-checkbox[data-ms-group="${groupKey}"]`).forEach(cb => {
+                cb.checked = checked;
+            });
+            msUpdateSelection();
+        }
+        window.msToggleGroup = msToggleGroup;
+
+        function msSyncGroup(groupKey) {
+            const boxes = document.querySelectorAll(`.ms-checkbox[data-ms-group="${groupKey}"]`);
+            const total = boxes.length;
+            const checked = [...boxes].filter(b => b.checked).length;
+            const head = document.querySelector(`.ms-checkbox[data-ms-group-all="${groupKey}"]`);
+            if (head) {
+                head.checked = checked === total;
+                head.indeterminate = checked > 0 && checked < total;
+            }
+            msUpdateSelection();
+        }
+        window.msSyncGroup = msSyncGroup;
+
+        let msConsoleLastId = 0;
+        let msConsoleTimer = null;
+
+        function msConsoleAppendEntry(entry) {
+            const box = document.getElementById('msConsole');
+            if (!box) return;
+            const nearTop = box.scrollTop < 40;
+            const ts = new Date(entry.ts * 1000).toLocaleTimeString('ru-RU', { hour12: false });
+            const line = document.createElement('div');
+            line.className = `ms-console-line ${entry.level || ''}`;
+            const userTag = entry.username
+                ? `<span class="user">[${escapeHtml(entry.username)}]</span>`
+                : '';
+            line.innerHTML = `<span class="ts">${ts}</span>${userTag}<span class="msg"></span>`;
+            line.querySelector('.msg').textContent = entry.message || '';
+            box.insertBefore(line, box.firstChild);
+            if (nearTop) box.scrollTop = 0;
+        }
+
+        async function msConsoleLoad() {
+            try {
+                const resp = await fetch(`/api/ms/console?since=${msConsoleLastId}&limit=500`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const entries = data.entries || [];
+                if (!entries.length) return;
+                entries.forEach(e => {
+                    msConsoleAppendEntry(e);
+                    if (e.id > msConsoleLastId) msConsoleLastId = e.id;
+                });
+            } catch {}
+        }
+        window.msConsoleLoad = msConsoleLoad;
+
+        function msConsoleLogLocal(level, message) {
+            msConsoleAppendEntry({
+                ts: Math.floor(Date.now() / 1000),
+                level,
+                message,
+                username: 'клиент',
+            });
+        }
+
+        function msConsoleStartPolling() {
+            if (msConsoleTimer) clearInterval(msConsoleTimer);
+            msConsoleTimer = setInterval(msConsoleLoad, 4000);
+        }
+
+        function msConsoleStopPolling() {
+            if (msConsoleTimer) { clearInterval(msConsoleTimer); msConsoleTimer = null; }
+        }
+
+        function msConsoleClear() {
+            const box = document.getElementById('msConsole');
+            if (!box) return;
+            box.innerHTML = '';
+        }
+        window.msConsoleClear = msConsoleClear;
+
+        const MS_STATUS_MAP = {
+            running:    { text: 'Running',    cls: 'ok',   color: '#10b981' },
+            stopped:    { text: 'Stopped',    cls: 'err',  color: '#ef4444' },
+            starting:   { text: 'Starting',   cls: 'warn', color: '#f59e0b' },
+            stopping:   { text: 'Stopping',   cls: 'warn', color: '#f59e0b' },
+            unreachable:{ text: 'Unreachable',cls: 'warn', color: '#6b7280' },
+            not_found:  { text: 'Not Found',  cls: 'warn', color: '#6b7280' },
+            unknown:    { text: '—',          cls: '',     color: '#6b7280' },
+        };
+        function msRenderStatus(node, state) {
+            const cell = document.querySelector(`[data-ms-status-cell="${CSS.escape(node)}"]`);
+            if (!cell) return;
+            const m = MS_STATUS_MAP[state] || MS_STATUS_MAP.unknown;
+            cell.innerHTML = `<span class="ms-status ${m.cls}"><span class="ms-node-dot" style="background:${m.color}"></span>${escapeHtml(m.text)}</span>`;
+        }
+
+        function msUpdatePollTime() {
+            const el = document.getElementById('msPollTime');
+            if (!el) return;
+            const d = new Date();
+            const time = d.toLocaleTimeString('ru-RU', { hour12: false });
+            const date = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            el.textContent = `${time}  ${date}`;
+        }
+
+        async function msPollStatuses() {
+            msAllNodes = [...document.querySelectorAll('.ms-checkbox[data-ms-node]')].map(cb => cb.dataset.msNode);
+            if (!msAllNodes.length) return;
+            try {
+                const resp = await fetch('/api/ms/status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nodes: msAllNodes }),
+                });
+                if (!resp.ok) {
+                    msAllNodes.forEach(n => { msStatuses[n] = 'unreachable'; msRenderStatus(n, 'unreachable'); });
+                } else {
+                    const data = await resp.json();
+                    const states = data.statuses || {};
+                    msAllNodes.forEach(n => {
+                        const s = states[n] || 'unreachable';
+                        msStatuses[n] = s;
+                        msRenderStatus(n, s);
+                    });
+                }
+            } catch {
+                msAllNodes.forEach(n => { msStatuses[n] = 'unreachable'; msRenderStatus(n, 'unreachable'); });
+            }
+            msUpdatePollTime();
+            msRefreshActionButtons();
+        }
+
+        const MS_REACHABLE = new Set(['running', 'stopped', 'starting', 'stopping']);
+        function msRefreshActionButtons() {
+            const stopBtn    = document.querySelector('.ms-action-btn.stop');
+            const startBtn   = document.querySelector('.ms-action-btn.start');
+            const restartBtn = document.querySelector('.ms-action-btn.restart');
+            if (!stopBtn || !startBtn || !restartBtn) return;
+            const selected = [...document.querySelectorAll('.ms-checkbox[data-ms-node]:checked')]
+                .map(b => b.dataset.msNode);
+            const apply = (btn, disabled, reason) => {
+                btn.disabled = disabled;
+                if (disabled && reason) btn.title = reason;
+                else btn.removeAttribute('title');
+            };
+            if (selected.length === 0) {
+                apply(stopBtn,    true, 'Сначала выберите хотя бы одну ноду');
+                apply(startBtn,   true, 'Сначала выберите хотя бы одну ноду');
+                apply(restartBtn, true, 'Сначала выберите хотя бы одну ноду');
+                return;
+            }
+            const states = selected.map(n => msStatuses[n] || 'unknown');
+            const unreachable = selected.filter(n => !MS_REACHABLE.has(msStatuses[n] || 'unknown'));
+            if (unreachable.length) {
+                const tip = `Недоступны: ${unreachable.join(', ')}`;
+                apply(stopBtn,    true, tip);
+                apply(startBtn,   true, tip);
+                apply(restartBtn, true, tip);
+                return;
+            }
+            const stoppedNodes = selected.filter(n => ['stopped', 'stopping'].includes(msStatuses[n]));
+            const runningNodes = selected.filter(n => ['running', 'starting'].includes(msStatuses[n]));
+            apply(stopBtn,
+                stoppedNodes.length > 0,
+                stoppedNodes.length ? `Уже остановлены: ${stoppedNodes.join(', ')}` : '');
+            apply(startBtn,
+                runningNodes.length > 0,
+                runningNodes.length ? `Уже запущены: ${runningNodes.join(', ')}` : '');
+            apply(restartBtn, false, '');
+        }
+        window.msRefreshActionButtons = msRefreshActionButtons;
+
+        function msStartPolling() {
+            msAllNodes = [...document.querySelectorAll('.ms-checkbox[data-ms-node]')].map(cb => cb.dataset.msNode);
+            if (msPollTimer)   { clearInterval(msPollTimer);   msPollTimer = null; }
+            if (msPollTimeout) { clearTimeout(msPollTimeout);  msPollTimeout = null; }
+            const delay = MS_POLL_INTERVAL_MS - (Date.now() % MS_POLL_INTERVAL_MS);
+            msPollTimeout = setTimeout(() => {
+                msPollStatuses();
+                msPollTimer = setInterval(msPollStatuses, MS_POLL_INTERVAL_MS);
+            }, delay);
+        }
+        window.msStartPolling = msStartPolling;
+
+        async function msAction(action) {
+            const boxes = document.querySelectorAll('.ms-checkbox[data-ms-node]:checked');
+            if (boxes.length === 0) {
+                toast('Сначала выберите хотя бы одну ноду', 'err');
+                return;
+            }
+            const nodes = [...boxes].map(b => b.dataset.msNode);
+            const meta = {
+                stop:    { title: 'Выключить службу',   verb: 'выключить',   kind: 'danger',  cls: 'btn-danger',  ok: 'Выключить' },
+                restart: { title: 'Перезагрузить службу', verb: 'перезагрузить', kind: 'warn',    cls: 'btn-warn',    ok: 'Перезагрузить' },
+                start:   { title: 'Включить службу',    verb: 'включить',    kind: 'success', cls: 'btn-success', ok: 'Включить' },
+            }[action];
+            const ok = await confirmModal({
+                title: meta.title,
+                message: `${meta.verb.charAt(0).toUpperCase() + meta.verb.slice(1)} службу ${MS_SERVICE_NAME} на ${nodes.length} ${nodes.length === 1 ? 'ноде' : 'нодах'}:`,
+                nodes,
+                kind: meta.kind,
+                confirmText: meta.ok,
+                confirmClass: meta.cls,
+            });
+            if (!ok) return;
+            try {
+                const resp = await fetch('/api/ms/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, nodes }),
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok) {
+                    msConsoleLogLocal('err', `POST /api/ms/action → ${resp.status}: ${data.error || 'нет ответа от сервера'}`);
+                }
+                msConsoleLoad();
+                msPollStatuses();
+            } catch (e) {
+                msConsoleLogLocal('err', `POST /api/ms/action → сеть: ${e.message}`);
+            }
+        }
+        window.msAction = msAction;
+
+        let _msEditingNode = null;   // редактируем существующую ноду
+        let _msAddingGroup = null;   // создаём новую в указанной группе
+
+        function setNodeRole(role) {
+            const hidden = document.getElementById('msNodeRole');
+            if (hidden) hidden.value = role || '';
+            document.querySelectorAll('#msNodeRolePicker .role-pick').forEach(b => {
+                b.classList.toggle('selected', b.dataset.role === role);
+            });
+        }
+        window.setNodeRole = setNodeRole;
+
+        function _msResetEditor() {
+            _msEditingNode = null;
+            _msAddingGroup = null;
+            document.getElementById('msNodeError').classList.remove('show');
+            document.getElementById('msNodeHost').value = '';
+            document.getElementById('msNodeService').value = '';
+            document.getElementById('msNodeKeyInput').value = '';
+            document.getElementById('msNodeHostHint').textContent = '';
+            document.getElementById('msNodeServiceHint').textContent = '';
+            setNodeRole('');
+            document.querySelectorAll('#msNodeRolePicker .role-pick').forEach(b => {
+                b.disabled = false;
+            });
+            const hint = document.getElementById('msNodeRoleHint');
+            if (hint) hint.textContent = 'В каждой группе может быть только один Master';
+        }
+
+        async function _msAdjustRoleOptions(currentKey) {
+            const masterBtn = document.querySelector('#msNodeRolePicker .role-pick[data-role="master"]');
+            if (!masterBtn) return;
+            try {
+                const resp = await fetch('/api/ms/nodes');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const allNodes = data.nodes || [];
+                // определяем group для редактируемой/создаваемой ноды
+                let group = _msAddingGroup;
+                if (!group && currentKey) {
+                    const cur = allNodes.find(n => n.key === currentKey);
+                    group = cur ? cur.group : null;
+                }
+                if (!group) return;
+                const master = allNodes.find(n =>
+                    (n.role || '').toLowerCase() === 'master' && n.group === group
+                );
+                const hint = document.getElementById('msNodeRoleHint');
+                if (master && master.key !== currentKey) {
+                    masterBtn.disabled = true;
+                    if (hint) hint.textContent = `Master в этой группе уже занят нодой «${master.key}»`;
+                    if (document.getElementById('msNodeRole').value === 'master') setNodeRole('');
+                } else {
+                    masterBtn.disabled = false;
+                    if (hint) hint.textContent = 'В каждой группе может быть только один Master';
+                }
+            } catch {}
+        }
+
+        async function openMsNodeEditor(key) {
+            _msResetEditor();
+            _msEditingNode = key;
+            document.getElementById('msNodeModalTitle').innerHTML = `Настройки ноды <span style="color:#c7d2fe;font-family:ui-monospace,monospace;font-weight:500">${escapeHtml(key)}</span>`;
+            document.getElementById('msNodeModalSub').textContent = 'Можно переопределить адрес и имя опрашиваемой службы';
+            document.getElementById('msNodeKeyField').style.display = '';
+            document.getElementById('msNodeKeyInput').value = key;
+            document.getElementById('msNodeDeleteBtn').style.display = '';
+            document.getElementById('msNodeSubmitBtn').textContent = 'Сохранить';
+            document.getElementById('msNodeHostHint').textContent    = 'DNS-имя или IP';
+            document.getElementById('msNodeServiceHint').textContent = 'имя Windows-службы';
+            document.getElementById('msNodeBackdrop').classList.add('open');
+            setTimeout(() => document.getElementById('msNodeKeyInput').focus(), 30);
+            try {
+                const resp = await fetch(`/api/ms/nodes/${encodeURIComponent(key)}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                document.getElementById('msNodeHost').value    = data.host    || '';
+                document.getElementById('msNodeService').value = data.service || '';
+                setNodeRole((data.role || '').toLowerCase());
+                _msAdjustRoleOptions(key);
+            } catch (e) {
+                const err = document.getElementById('msNodeError');
+                err.textContent = `Не удалось загрузить сохранённые настройки: ${e.message}`;
+                err.classList.add('show');
+            }
+        }
+        window.openMsNodeEditor = openMsNodeEditor;
+
+        function openMsNodeAdder(groupKey) {
+            _msResetEditor();
+            _msAddingGroup = groupKey;
+            const groupTitle = (MS_GROUPS.find(g => g.key === groupKey) || {}).title || groupKey;
+            document.getElementById('msNodeModalTitle').textContent = `Добавить хост в группу ${groupTitle}`;
+            document.getElementById('msNodeModalSub').textContent = 'Заполните все поля.';
+            document.getElementById('msNodeKeyField').style.display = '';
+            document.getElementById('msNodeDeleteBtn').style.display = 'none';
+            document.getElementById('msNodeSubmitBtn').textContent = 'Создать';
+            document.getElementById('msNodeHostHint').textContent    = 'DNS-имя или IP';
+            document.getElementById('msNodeServiceHint').textContent = 'имя Windows-службы (например, Inceptum.AppServer.3.0)';
+            document.getElementById('msNodeBackdrop').classList.add('open');
+            setTimeout(() => document.getElementById('msNodeKeyInput').focus(), 30);
+            _msAdjustRoleOptions(null);
+        }
+        window.openMsNodeAdder = openMsNodeAdder;
+
+        function closeMsNodeEditor() {
+            document.getElementById('msNodeBackdrop').classList.remove('open');
+            _msResetEditor();
+        }
+        window.closeMsNodeEditor = closeMsNodeEditor;
+
+        async function saveMsNode(e) {
+            e.preventDefault();
+            const errBox = document.getElementById('msNodeError');
+            errBox.classList.remove('show');
+            const key  = document.getElementById('msNodeKeyInput').value.trim();
+            const host = document.getElementById('msNodeHost').value.trim();
+            const role = (document.getElementById('msNodeRole')?.value || '').trim();
+            if (!key || !host || !role) {
+                errBox.textContent = 'Заполните все поля: ключ, хост, роль';
+                errBox.classList.add('show');
+                return false;
+            }
+            try {
+                let resp;
+                if (_msAddingGroup) {
+                    resp = await fetch('/api/ms/nodes', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({key, group: _msAddingGroup, host, role}),
+                    });
+                } else if (_msEditingNode) {
+                    resp = await fetch(`/api/ms/nodes/${encodeURIComponent(_msEditingNode)}`, {
+                        method: 'PATCH',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({key, host, role}),
+                    });
+                } else {
+                    return false;
+                }
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    errBox.textContent = data.error || `Ошибка ${resp.status}`;
+                    errBox.classList.add('show');
+                    return false;
+                }
+                closeMsNodeEditor();
+                await loadMsNodes();
+                renderMicroservices();
+                msSyncConsoleHeight();
+                msPollStatuses();
+                msConsoleLoad();
+                if (location.hash === '#nodes_catalog' && typeof loadNodesCatalog === 'function') loadNodesCatalog();
+            } catch (err) {
+                errBox.textContent = `Сеть: ${err.message}`;
+                errBox.classList.add('show');
+            }
+            return false;
+        }
+        window.saveMsNode = saveMsNode;
+
+        async function deleteMsNode() {
+            if (!_msEditingNode) return;
+            const key = _msEditingNode;
+            const ok = await confirmModal({
+                title: `Удалить хост «${key}»?`,
+                message: 'Запись будет убрана из реестра. Накопленный лог не очищается.',
+                kind: 'danger',
+                confirmText: 'Удалить',
+                confirmClass: 'btn-danger',
+                compact: true,
+            });
+            if (!ok) return;
+            const errBox = document.getElementById('msNodeError');
+            errBox.classList.remove('show');
+            try {
+                const resp = await fetch(`/api/ms/nodes/${encodeURIComponent(key)}`, { method: 'DELETE' });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    errBox.textContent = data.error || `Ошибка ${resp.status}`;
+                    errBox.classList.add('show');
+                    return;
+                }
+                closeMsNodeEditor();
+                await loadMsNodes();
+                renderMicroservices();
+                msSyncConsoleHeight();
+                msPollStatuses();
+                msConsoleLoad();
+                if (location.hash === '#nodes_catalog' && typeof loadNodesCatalog === 'function') loadNodesCatalog();
+            } catch (err) {
+                errBox.textContent = `Сеть: ${err.message}`;
+                errBox.classList.add('show');
+            }
+        }
+        window.deleteMsNode = deleteMsNode;
+
+        // ============ MICROSERVICES LISTING ============
+        const ITL_SERVICES = [
+            'Accounts', 'CashDesk.Backend', 'CashReportMaker', 'ControlPanel.Api',
+            'DocumentStore', 'Gates.Flextera', 'Gates.RiaGateway',
+            'Integration.PaymentCenterModerator', 'ListsApi', 'OperationDefinitionStore',
+            'Operations.Api', 'Operations.Callbacks', 'Operations.Catalog',
+            'Operations.Sagas', 'PaymentCenterHooks.AntiFraud',
+            'Processing.AccountPaymentOrderApi', 'SequenceProviderApi',
+            'TransferControlNumberGenerator', 'Unistream.CryptoApi',
+            'Unistream.FeeCalculationProviderApi', 'Unistream.Processing.Integration',
+            'Unistream.Processing.Operations',
+        ];
+        const ITLR_COMMON = ['Clients', 'InfoApi', 'Raven3', 'SecurityManager'];
+        let HOST_MS_LIST = [
+            {group: 'GATE', hosts: [
+                {name: 'sr-itlgate101', svcs: [
+                    'Gates.GenericPayments', 'Gates.RussianStandardBank',
+                    'Gates.TinkoffCreditSystems', 'Gates.UniversalPaymentTransfer',
+                    'MerchantApi', 'PaySystem.CurrencyLots.Api',
+                    'ProcessingGateService', 'Unistream.CryptoApi',
+                    'Unistream.Gates.BpcGateway', 'Unistream.Intersystem.Sync',
+                    'Unistream.Recognition.Gateway',
+                ]},
+                {name: 'sr-itlgate102', svcs: [
+                    'Gates.GenericPayments', 'Gates.RussianStandardBank',
+                    'Gates.TinkoffCreditSystems', 'MerchantApi',
+                    'Unistream.Gates.BpcGateway',
+                ]},
+                {name: 'sr-itlgate103', svcs: [
+                    'Gates.GenericPayments', 'Gates.RussianStandardBank',
+                    'Gates.TinkoffCreditSystems', 'MerchantApi',
+                    'Unistream.Gates.BpcGateway', 'Unistream.CryptoApi',
+                ]},
+                {name: 'sr-itlgate104', svcs: [
+                    'Gates.GenericPayments', 'Gates.RussianStandardBank',
+                    'Gates.TinkoffCreditSystems', 'MerchantApi',
+                    'Unistream.Gates.BpcGateway',
+                ]},
             ]},
-            {key: 'itl', title: 'ITL', nodes: [
-                'sr-itl100', 'sr-itl101', 'sr-itl102', 'sr-itl103', 'sr-itl104', 'sr-itl105',
-                'sr-itl110', 'sr-itl111', 'sr-itl112', 'sr-itl113', 'sr-itl114', 'sr-itl115',
+            {group: 'ITL 1 плечо', hosts: [
+                {name: 'sr-itl100', svcs: ITL_SERVICES},
+                {name: 'sr-itl101', svcs: ITL_SERVICES},
+                {name: 'sr-itl102', svcs: ITL_SERVICES},
+                {name: 'sr-itl103', svcs: ITL_SERVICES},
+                {name: 'sr-itl104', svcs: ITL_SERVICES},
+                {name: 'sr-itl105', svcs: ITL_SERVICES},
             ]},
-            {key: 'itlr', title: 'ITLR', nodes: [
-                'sr-itlr100', 'sr-itlr101', 'sr-itlr102', 'sr-itlr103',
+            {group: 'ITL 2 плечо', hosts: [
+                {name: 'sr-itl110', svcs: ITL_SERVICES},
+                {name: 'sr-itl111', svcs: ITL_SERVICES},
+                {name: 'sr-itl112', svcs: ITL_SERVICES},
+                {name: 'sr-itl113', svcs: ITL_SERVICES},
+                {name: 'sr-itl114', svcs: ITL_SERVICES},
+                {name: 'sr-itl115', svcs: ITL_SERVICES},
             ]},
-            {key: 'btl', title: 'BTL', nodes: [
-                'sr-btlapp101',
+            {group: 'ITLR', hosts: [
+                {name: 'sr-itlr100', svcs: ['CashDashboard', ...ITLR_COMMON]},
+                {name: 'sr-itlr101', svcs: ITLR_COMMON},
+                {name: 'sr-itlr102', svcs: ITLR_COMMON},
+                {name: 'sr-itlr103', svcs: ITLR_COMMON},
+            ]},
+            {group: 'BTL', hosts: [
+                {name: 'sr-btlapp101', svcs: ['Messenger.Backend', 'SmsAndBonusAdapter']},
             ]},
         ];
-        let msActiveTab = 'all';
 
-        function initMicroservices() {
-            const tabs = document.getElementById('msTabs');
-            if (tabs && !tabs.dataset.built) {
-                const allBtns = [{key: 'all', title: 'Все микросервисы'}, ...MS_GROUPS];
-                tabs.innerHTML = allBtns.map(t =>
-                    `<button class="ms-tab" data-ms-tab="${escapeHtml(t.key)}" onclick="setMsTab('${escapeHtml(t.key)}')">${escapeHtml(t.title)}</button>`
-                ).join('');
-                tabs.dataset.built = '1';
+        // Сервисы, которых нет в скриптах nginx-балансировщиков (drain/return не работает).
+        // Балансируются: GATE → Gates.GenericPayments;
+        //   ITL → Accounts, CashDesk.Backend, CashReportMaker, ControlPanel.Api,
+        //         OperationDefinitionStore, DocumentStore, Unistream.FeeCalculationProviderApi,
+        //         Unistream.Processing.Integration, Integration.PaymentCenterModerator,
+        //         Operations.Api, Operations.Catalog;
+        //   ITLR → Clients, InfoApi, SecurityManager.
+        let NOT_BALANCED_SVCS = new Set([
+            'CashDashboard',
+            'Gates.Flextera',
+            'Gates.RiaGateway',
+            'Gates.RussianStandardBank',
+            'Gates.TinkoffCreditSystems',
+            'Gates.UniversalPaymentTransfer',
+            'ListsApi',
+            'MerchantApi',
+            'Messenger.Backend',
+            'Operations.Callbacks',
+            'Operations.Sagas',
+            'PaySystem.CurrencyLots.Api',
+            'PaymentCenterHooks.AntiFraud',
+            'Processing.AccountPaymentOrderApi',
+            'ProcessingGateService',
+            'Raven3',
+            'SequenceProviderApi',
+            'SmsAndBonusAdapter',
+            'TransferControlNumberGenerator',
+            'Unistream.CryptoApi',
+            'Unistream.Gates.BpcGateway',
+            'Unistream.Intersystem.Sync',
+            'Unistream.Processing.Operations',
+            'Unistream.Recognition.Gateway',
+        ]);
+
+        // Инвертированный индекс: сервис → [{host, group}, ...]
+        function buildServiceIndex() {
+            const idx = {};
+            for (const g of HOST_MS_LIST) {
+                for (const h of g.hosts) {
+                    for (const s of h.svcs) {
+                        if (!idx[s]) idx[s] = [];
+                        idx[s].push({host: h.name, group: g.group});
+                    }
+                }
             }
-            setMsTab(msActiveTab);
+            return idx;
         }
 
-        function setMsTab(key) {
-            msActiveTab = key;
-            document.querySelectorAll('#msTabs .ms-tab').forEach(b => {
-                b.classList.toggle('active', b.dataset.msTab === key);
+        let _svcIndex = null;
+        let _svcSelected = null;
+        let _svcFilter = '';
+        let _svcStatuses = {};      // {hostKey: state} — для текущего открытого сервиса
+        let _svcVersions = {};      // {hostKey: 'x.y.z'}
+        let _svcRotation = {};      // {service: {hostKey: bool}} — true=в ротации, false=выведен; undefined=неизвестно
+        let _svcHealth = {};        // {service: 'ok'|'bad'} — health-индикатор в сайдбаре
+        let _svcAllPollActive = false;
+        let _svcPollTimer = null;
+        let _svcPollTimeout = null;
+        // Selection across services: {service: Set(hostKey)}
+        const _svcCheckSel = {};
+
+        async function loadHostMsCatalog() {
+            try {
+                const [nodesResp, catResp, groupsResp] = await Promise.all([
+                    fetch('/api/ms/nodes'),
+                    fetch('/api/catalog/microservices'),
+                    fetch('/api/ms/groups'),
+                ]);
+                if (!nodesResp.ok || !catResp.ok || !groupsResp.ok) return false;
+                const nodes = (await nodesResp.json()).nodes || [];
+                const services = (await catResp.json()).microservices || [];
+                const groups = (await groupsResp.json()).groups || [];
+                const nodesByGroup = {};
+                for (const n of nodes) (nodesByGroup[n.group || ''] ??= []).push(n.key);
+                const hostServices = {};
+                for (const svc of services) {
+                    for (const h of (svc.nodes || [])) (hostServices[h] ??= new Set()).add(svc.name);
+                }
+                HOST_MS_LIST = groups.filter(grp => nodesByGroup[grp.key] && nodesByGroup[grp.key].length).map(grp => ({
+                    group: grp.title,
+                    hosts: nodesByGroup[grp.key].map(h => ({
+                        name: h,
+                        svcs: [...(hostServices[h] || new Set())].sort((a, b) => a.localeCompare(b)),
+                    })),
+                }));
+                NOT_BALANCED_SVCS = new Set(services.filter(s => !s.balanced).map(s => s.name));
+                _svcIndex = null;
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        async function renderMicroservicesList() {
+            const root = document.getElementById('msListRoot');
+            if (!root) return;
+            await loadHostMsCatalog();
+            if (!_svcIndex) _svcIndex = buildServiceIndex();
+            // Не выбираем сервис автоматически — пользователь выбирает сам.
+            if (_svcSelected && !_svcIndex[_svcSelected]) _svcSelected = null;
+            root.innerHTML = `
+                <div id="svcRunBanner" style="display:none"></div>
+                <div class="svc-controls">
+                    <div class="svc-controls-row svc-controls-buttons">
+                        <button type="button" class="ms-action-btn restart" id="svcRestartBtn"    onclick="svcAction('restart')">Перезагрузить с балансировкой</button>
+                        <button type="button" class="ms-action-btn restart" id="svcRestartRawBtn" onclick="svcAction('restart_raw')">Перезагрузка без балансировки</button>
+                    </div>
+                    <div class="svc-controls-row svc-controls-buttons">
+                        <button type="button" class="ms-action-btn stop"  id="svcStopBtn"  onclick="svcAction('stop')">Выключить микросервисы</button>
+                        <button type="button" class="ms-action-btn start" id="svcStartBtn" onclick="svcAction('start')">Включить микросервисы</button>
+                    </div>
+                    <div class="svc-controls-row svc-controls-buttons">
+                        <button type="button" class="ms-action-btn stop"  id="svcDrainBtn"  onclick="svcAction('drain')">Вывести из ротации</button>
+                        <button type="button" class="ms-action-btn start" id="svcReturnBtn" onclick="svcAction('return')">Ввести в ротацию</button>
+                    </div>
+                </div>
+                <div class="svc-layout">
+                    <div class="svc-sidebar">
+                        <div class="svc-sidebar-head">
+                            <label class="svc-sidebar-selectall">
+                                <input type="checkbox" class="ms-checkbox" id="svcSelectAllCb"
+                                       onchange="svcSelectAll(this.checked)">
+                                <span>Выделить все</span>
+                            </label>
+                            <div class="svc-sidebar-legend">
+                                <svg class="svc-no-balance-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M16 16l3-8 3 8c-2 1-4 1-6 0z"/>
+                                    <path d="M2 16l3-8 3 8c-2 1-4 1-6 0z"/>
+                                    <path d="M7 21h10"/>
+                                    <path d="M12 3v18"/>
+                                    <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
+                                    <line x1="3" y1="3" x2="21" y2="21" stroke="#ef4444" stroke-width="2.2"/>
+                                </svg>
+                                <span>не балансируется</span>
+                            </div>
+                            <button type="button" class="svc-tool-btn" id="svcRefreshBtn" onclick="svcRefreshAll()" title="Заново опросить статусы всех микросервисов">⟳ Обновить статусы</button>
+                        </div>
+                        <div class="svc-sidebar-list" id="svcList"></div>
+                    </div>
+                    <div class="svc-content" id="svcContent"></div>
+                    <div class="svc-console-box">
+                        <div class="svc-console-half">
+                            <div class="ms-console-header">
+                                <span class="ms-console-title">Консоль действий</span>
+                            </div>
+                            <div class="ms-console" id="svcConsole"></div>
+                        </div>
+                        <div class="svc-console-half svc-console-errors-half">
+                            <div class="ms-console-header">
+                                <span class="ms-console-title" style="color:#fca5a5">Консоль ошибок</span>
+                            </div>
+                            <div class="ms-console" id="svcConsoleErrors"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            renderSvcSidebar();
+            renderSvcContent();
+            refreshSvcControls();
+            if (_svcSelected) startSvcPolling();
+            else stopSvcPolling();
+            startSvcAllHealthPoll();
+            startSvcOrchPolling();
+        }
+        window.renderMicroservicesList = renderMicroservicesList;
+
+        function renderSvcSidebar() {
+            const all = Object.keys(_svcIndex).sort((a, b) => a.localeCompare(b));
+            const list = document.getElementById('svcList');
+            if (!list) return;
+            list.innerHTML = all.map(s => {
+                const totalHosts = _svcIndex[s].length;
+                const sel = _svcCheckSel[s] ? _svcCheckSel[s].size : 0;
+                const allChecked = sel === totalHosts && totalHosts > 0;
+                const someChecked = sel > 0 && !allChecked;
+                const safe = s.replace(/'/g, "\\'");
+                const cls = ['svc-list-row'];
+                if (s === _svcSelected) cls.push('active');
+                if (_svcHealth[s]) cls.push(_svcHealth[s]); // 'ok' | 'warn' | 'bad'
+                return `
+                    <div class="${cls.join(' ')}">
+                        <input type="checkbox" class="ms-checkbox"
+                               data-svc-all="${escapeHtml(s)}"
+                               ${allChecked ? 'checked' : ''}
+                               onclick="event.stopPropagation(); toggleSvcAll('${safe}', this.checked)"
+                               title="Выбрать все ноды этого сервиса">
+                        <button type="button" class="svc-list-item" onclick="selectSvcTab('${safe}')" title="${escapeHtml(s)}${NOT_BALANCED_SVCS.has(s) ? ' — не балансируется' : ''}">
+                            <span class="svc-list-text">
+                                <span class="svc-list-name">${escapeHtml(s)}</span>
+                                ${NOT_BALANCED_SVCS.has(s) ? `
+                                    <svg class="svc-no-balance-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <title>Не балансируется</title>
+                                        <path d="M16 16l3-8 3 8c-2 1-4 1-6 0z"/>
+                                        <path d="M2 16l3-8 3 8c-2 1-4 1-6 0z"/>
+                                        <path d="M7 21h10"/>
+                                        <path d="M12 3v18"/>
+                                        <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
+                                        <line x1="3" y1="3" x2="21" y2="21" stroke="#ef4444" stroke-width="2.2"/>
+                                    </svg>
+                                ` : ''}
+                            </span>
+                        </button>
+                    </div>`;
+            }).join('');
+            // Apply indeterminate state on group checkboxes
+            for (const s of all) {
+                const totalHosts = _svcIndex[s].length;
+                const selSize = _svcCheckSel[s] ? _svcCheckSel[s].size : 0;
+                const cb = list.querySelector(`input[data-svc-all="${CSS.escape(s)}"]`);
+                if (cb) cb.indeterminate = selSize > 0 && selSize < totalHosts;
+            }
+        }
+
+        function toggleSvcAll(service, checked) {
+            const hosts = (_svcIndex[service] || []).map(h => h.host);
+            if (checked) {
+                _svcCheckSel[service] = new Set(hosts);
+            } else {
+                delete _svcCheckSel[service];
+            }
+            renderSvcSidebar();
+            if (_svcSelected === service) renderSvcContent();
+            refreshSvcControls();
+        }
+        window.toggleSvcAll = toggleSvcAll;
+
+        function toggleSvcGroup(service, groupName, checked) {
+            // hosts of selected service that fall into the named group
+            const targetHosts = (_svcIndex[service] || [])
+                .filter(h => h.group === groupName)
+                .map(h => h.host);
+            if (!_svcCheckSel[service]) _svcCheckSel[service] = new Set();
+            if (checked) targetHosts.forEach(h => _svcCheckSel[service].add(h));
+            else         targetHosts.forEach(h => _svcCheckSel[service].delete(h));
+            if (_svcCheckSel[service].size === 0) delete _svcCheckSel[service];
+            renderSvcSidebar();
+            renderSvcContent();
+            refreshSvcControls();
+        }
+        window.toggleSvcGroup = toggleSvcGroup;
+
+        function toggleSvcHost(service, host, checked) {
+            if (!_svcCheckSel[service]) _svcCheckSel[service] = new Set();
+            if (checked) _svcCheckSel[service].add(host);
+            else _svcCheckSel[service].delete(host);
+            if (_svcCheckSel[service].size === 0) delete _svcCheckSel[service];
+            renderSvcSidebar();
+            refreshSvcControls();
+        }
+        window.toggleSvcHost = toggleSvcHost;
+
+        function refreshSvcControls() {
+            const ids = ['svcDrainBtn', 'svcReturnBtn', 'svcRestartBtn', 'svcRestartRawBtn', 'svcStartBtn', 'svcStopBtn'];
+            const btns = ids.map(id => document.getElementById(id)).filter(Boolean);
+            refreshSvcSelectAllState();
+            const services = Object.keys(_svcCheckSel);
+            const totalHosts = services.reduce((acc, s) => acc + _svcCheckSel[s].size, 0);
+            const busy = !!(_svcRunState && _svcRunState.busy);
+            btns.forEach(b => b.disabled = (totalHosts === 0) || busy);
+        }
+
+        function svcClearSelection() {
+            for (const k of Object.keys(_svcCheckSel)) delete _svcCheckSel[k];
+            renderSvcSidebar();
+            renderSvcContent();
+            refreshSvcControls();
+        }
+        window.svcClearSelection = svcClearSelection;
+
+        function svcSelectAll(checked) {
+            if (checked) {
+                for (const svc of Object.keys(_svcIndex || {})) {
+                    const hosts = (_svcIndex[svc] || []).map(h => h.host);
+                    if (hosts.length) _svcCheckSel[svc] = new Set(hosts);
+                }
+            } else {
+                for (const k of Object.keys(_svcCheckSel)) delete _svcCheckSel[k];
+            }
+            renderSvcSidebar();
+            renderSvcContent();
+            refreshSvcControls();
+        }
+        window.svcSelectAll = svcSelectAll;
+
+        function refreshSvcSelectAllState() {
+            const cb = document.getElementById('svcSelectAllCb');
+            if (!cb) return;
+            const all = Object.keys(_svcIndex || {});
+            if (!all.length) { cb.checked = false; cb.indeterminate = false; return; }
+            let totalAvail = 0, totalSel = 0;
+            for (const svc of all) {
+                const hosts = (_svcIndex[svc] || []).map(h => h.host);
+                totalAvail += hosts.length;
+                totalSel   += (_svcCheckSel[svc] ? _svcCheckSel[svc].size : 0);
+            }
+            cb.checked = totalSel > 0 && totalSel === totalAvail;
+            cb.indeterminate = totalSel > 0 && totalSel < totalAvail;
+        }
+
+        function updateRefreshBtnState() {
+            const btn = document.getElementById('svcRefreshBtn');
+            if (!btn) return;
+            const busy = !!(_svcRunState && _svcRunState.busy);
+            if (busy) {
+                btn.disabled = true;
+                btn.textContent = 'Обновление раз в 5 секунд';
+            } else if (btn.dataset.cooldown === '1') {
+                btn.disabled = true;
+                btn.textContent = '⟳ Обновить статусы';
+            } else {
+                btn.disabled = false;
+                btn.textContent = '⟳ Обновить статусы';
+            }
+        }
+
+        async function svcRefreshAll() {
+            const btn = document.getElementById('svcRefreshBtn');
+            if (!btn || btn.disabled) return;
+            btn.dataset.cooldown = '1';
+            updateRefreshBtnState();
+            try {
+                await fetchAllSvcHealth();
+                if (_svcSelected) await fetchSvcStatuses();
+            } catch {}
+            setTimeout(() => {
+                delete btn.dataset.cooldown;
+                updateRefreshBtnState();
+            }, 3000);
+        }
+        window.svcRefreshAll = svcRefreshAll;
+
+        // ===== Поллинг общего состояния и логов оркестратора =====
+        let _svcRunState = { busy: false };
+        let _svcRunStateTimer = null;
+        let _svcLogTimer = null;
+        let _svcLogLastIds = { action: 0, error: 0 };
+        let _svcBusyHealthTimer = null;
+        let _svcWasBusy = false;
+
+        function _appendSvcLogLine(target, e) {
+            if (!target) return;
+            const nearTop = target.scrollTop < 40;
+            const ts = new Date(e.ts * 1000).toLocaleTimeString('ru-RU', {hour12: false});
+            const line = document.createElement('div');
+            line.className = `ms-console-line ${e.level || 'info'}`;
+            const u = e.username ? `<span class="user">[${escapeHtml(e.username)}]</span>` : '';
+            line.innerHTML = `<span class="ts">${ts}</span>${u}<span class="msg"></span>`;
+            line.querySelector('.msg').textContent = e.message || '';
+            target.insertBefore(line, target.firstChild);
+            if (nearTop) target.scrollTop = 0;
+        }
+
+        async function fetchSvcServerLog() {
+            try {
+                const url = `/api/svc/console?since_action=${_svcLogLastIds.action}&since_error=${_svcLogLastIds.error}&limit=500`;
+                const resp = await fetch(url);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const tgtA = document.getElementById('svcConsole');
+                const tgtE = document.getElementById('svcConsoleErrors');
+                for (const e of (data.actions || [])) {
+                    _appendSvcLogLine(tgtA, e);
+                    if (e.id > _svcLogLastIds.action) _svcLogLastIds.action = e.id;
+                }
+                for (const e of (data.errors || [])) {
+                    _appendSvcLogLine(tgtE, e);
+                    if (e.id > _svcLogLastIds.error) _svcLogLastIds.error = e.id;
+                }
+            } catch {}
+        }
+
+        async function fetchSvcRunState() {
+            try {
+                const resp = await fetch('/api/svc/orchestrate/state');
+                if (!resp.ok) return;
+                _svcRunState = await resp.json();
+                renderSvcRunBanner();
+                refreshSvcControls();
+                updateRefreshBtnState();
+
+                // Автоопрос статусов во время операции (раз в 5 с)
+                const busy = !!_svcRunState.busy;
+                if (busy && !_svcBusyHealthTimer) {
+                    _svcBusyHealthTimer = setInterval(() => {
+                        fetchAllSvcHealth();
+                        if (_svcSelected) fetchSvcStatuses();
+                    }, 5000);
+                } else if (!busy && _svcBusyHealthTimer) {
+                    clearInterval(_svcBusyHealthTimer);
+                    _svcBusyHealthTimer = null;
+                }
+                // На переходе busy→false — финальный опрос
+                if (_svcWasBusy && !busy) {
+                    fetchAllSvcHealth();
+                    if (_svcSelected) fetchSvcStatuses();
+                }
+                _svcWasBusy = busy;
+            } catch {}
+        }
+
+        function startSvcOrchPolling() {
+            stopSvcOrchPolling();
+            // первый раз сразу
+            fetchSvcRunState();
+            fetchSvcServerLog();
+            _svcRunStateTimer = setInterval(fetchSvcRunState, 2000);
+            _svcLogTimer      = setInterval(fetchSvcServerLog, 2000);
+        }
+        function stopSvcOrchPolling() {
+            if (_svcRunStateTimer)   { clearInterval(_svcRunStateTimer);   _svcRunStateTimer   = null; }
+            if (_svcLogTimer)        { clearInterval(_svcLogTimer);        _svcLogTimer        = null; }
+            if (_svcBusyHealthTimer) { clearInterval(_svcBusyHealthTimer); _svcBusyHealthTimer = null; }
+        }
+        window.startSvcOrchPolling = startSvcOrchPolling;
+        window.stopSvcOrchPolling  = stopSvcOrchPolling;
+
+        function renderSvcRunBanner() {
+            const wrap = document.getElementById('svcRunBanner');
+            if (!wrap) return;
+            const s = _svcRunState;
+            if (!s || !s.busy) {
+                wrap.innerHTML = '';
+                wrap.style.display = 'none';
+                return;
+            }
+            const me = state.me?.username;
+            const canCancel = (s.username === me) || state.me?.role === 'admin';
+            const since = s.started_at ? new Date(s.started_at * 1000).toLocaleTimeString('ru-RU',{hour12:false}) : '?';
+            const actLabel = {
+                restart: 'Перезагрузка с балансировкой',
+                restart_raw: 'Перезагрузка без балансировки',
+                start: 'Включение',
+                stop: 'Выключение',
+                drain: 'Вывод из ротации',
+                return: 'Ввод в ротацию',
+            }[s.action] || s.action;
+            const cancelMark = s.cancel_requested ? ' <span style="color:#fde68a">(прерывание запрошено)</span>' : '';
+            const isAdmin = state.me?.role === 'admin';
+            wrap.style.display = '';
+            wrap.innerHTML = `
+                <div class="svc-run-banner">
+                    <span class="svc-run-banner-lock">🔒</span>
+                    <span class="svc-run-banner-text">Идёт <strong>${escapeHtml(actLabel)}</strong> от <strong>${escapeHtml(s.username || '?')}</strong>, начата в ${since}${cancelMark}</span>
+                    ${canCancel && !s.cancel_requested
+                        ? `<button type="button" class="svc-clear-btn" onclick="svcCancelRun()">Прервать</button>`
+                        : ''}
+                    ${isAdmin
+                        ? `<button type="button" class="svc-tool-btn" onclick="svcForceUnlock()" title="Принудительно снять замок (для умершего воркера)">Снять замок</button>`
+                        : ''}
+                </div>`;
+        }
+
+        async function svcForceUnlock() {
+            const ok = await confirmModal({
+                title: 'Принудительно снять замок?',
+                message: 'Используйте только если оркестратор завис из-за умершего воркера. Если поток ещё жив — данные могут разойтись.',
+                kind: 'danger',
+                confirmText: 'Снять замок',
+                confirmClass: 'btn-danger',
+                compact: true,
             });
-            const out = document.getElementById('msContent');
-            const groupHtml = (g) => `
-                <div class="ms-group">
-                    <div class="ms-group-title">${escapeHtml(g.title)} · ${g.nodes.length}</div>
-                    <div class="ms-grid">
-                        ${g.nodes.map(n => `<div class="ms-node"><span class="ms-node-dot"></span>${escapeHtml(n)}</div>`).join('')}
+            if (!ok) return;
+            try {
+                const resp = await fetch('/api/svc/orchestrate/force-unlock', {method: 'POST'});
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    toast(data.error || `Ошибка ${resp.status}`, 'err');
+                    return;
+                }
+                fetchSvcRunState();
+            } catch (e) {
+                toast(`Сеть: ${e.message}`, 'err');
+            }
+        }
+        window.svcForceUnlock = svcForceUnlock;
+
+        async function svcCancelRun() {
+            const ok = await confirmModal({
+                title: 'Прервать текущую операцию?',
+                message: 'Подвисшие микросервисы останутся в текущем состоянии — разбираться руками.',
+                kind: 'danger',
+                confirmText: 'Прервать',
+                confirmClass: 'btn-danger',
+                compact: true,
+            });
+            if (!ok) return;
+            try {
+                const resp = await fetch('/api/svc/orchestrate/cancel', {method: 'POST'});
+                if (!resp.ok) {
+                    const data = await resp.json().catch(()=>({}));
+                    toast(data.error || `Ошибка ${resp.status}`, 'err');
+                    return;
+                }
+                fetchSvcRunState();
+            } catch (e) {
+                toast(`Сеть: ${e.message}`, 'err');
+            }
+        }
+        window.svcCancelRun = svcCancelRun;
+
+        async function svcAction(action) {
+            const services = Object.keys(_svcCheckSel).sort((a, b) => a.localeCompare(b));
+            if (!services.length) return;
+            const withBalancer = true;
+            const items = services.flatMap(s => [...(_svcCheckSel[s] || [])].map(host => ({service: s, host})));
+            const meta = {
+                drain:       { title: 'Вывод из ротации',                  verb: 'вывести из ротации',                  ok: 'Вывести',     kind: 'warn',    cls: 'btn-warn'    },
+                return:      { title: 'Ввод в ротацию',                    verb: 'ввести в ротацию',                    ok: 'Ввести',      kind: 'success', cls: 'btn-success' },
+                restart:     { title: 'Перезагрузка с балансировкой',     verb: 'перезагрузить с балансировкой',       ok: 'Перезагрузить', kind: 'warn',    cls: 'btn-warn'    },
+                restart_raw: { title: 'Перезагрузка без балансировки',    verb: 'перезагрузить без балансировки',      ok: 'Перезагрузить', kind: 'warn',    cls: 'btn-warn'    },
+                start:       { title: 'Включение микросервисов',          verb: 'включить микросервисы',               ok: 'Включить',    kind: 'success', cls: 'btn-success' },
+                stop:        { title: 'Выключение микросервисов',         verb: 'выключить микросервисы',              ok: 'Выключить',   kind: 'danger',  cls: 'btn-danger'  },
+            }[action];
+            if (!meta) return;
+            const totalHosts = items.length;
+            // host → group (плечо)
+            const hostGroup = {};
+            for (const grp of HOST_MS_LIST) {
+                for (const h of grp.hosts) hostGroup[h.name] = grp.group;
+            }
+            const shoulderOrder = HOST_MS_LIST.map(g => g.group);
+            const groups = services.map(s => {
+                const selHosts = [...(_svcCheckSel[s] || [])].sort((a, b) => a.localeCompare(b));
+                const bySh = {};
+                for (const h of selHosts) {
+                    const sh = hostGroup[h] || '—';
+                    (bySh[sh] ??= []).push(h);
+                }
+                const subgroups = shoulderOrder.filter(sh => bySh[sh]).map(sh => ({
+                    label: sh,
+                    hosts: bySh[sh],
+                }));
+                return { title: s, total: selHosts.length, subgroups };
+            });
+            const usesBalancer = ['drain', 'return', 'restart'].includes(action);
+            const flags = [
+                { label: `${services.length} ${services.length === 1 ? 'сервис' : 'сервисов'}` },
+                { label: `${totalHosts} ${totalHosts === 1 ? 'хост' : 'хостов'}` },
+                usesBalancer
+                    ? { label: '⚖ С балансировкой' }
+                    : { label: 'Без балансировки', muted: true },
+            ];
+            const ok = await confirmModal({
+                title: meta.title,
+                message: '',
+                groups,
+                flags,
+                kind: meta.kind,
+                confirmText: meta.ok,
+                confirmClass: meta.cls,
+            });
+            if (!ok) return;
+            try {
+                const resp = await fetch('/api/svc/orchestrate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        action,
+                        nodes: items.map(i => ({host: i.host, service: i.service})),
+                    }),
+                });
+                if (resp.status === 409) {
+                    const data = await resp.json().catch(() => ({}));
+                    const cur = data.current || {};
+                    toast(`Уже идёт операция «${cur.action || '?'}» от ${cur.username || '?'}`, 'err');
+                    return;
+                }
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    toast(data.error || `Ошибка ${resp.status}`, 'err');
+                    return;
+                }
+                // Сценарий запущен — поллинг подхватит state и лог
+                fetchSvcRunState();
+                fetchSvcServerLog();
+            } catch (e) {
+                toast(`Сеть: ${e.message}`, 'err');
+            }
+        }
+        window.svcAction = svcAction;
+
+        function selectSvcTab(s) {
+            _svcSelected = s;
+            _svcStatuses = {};
+            renderSvcSidebar();
+            renderSvcContent();
+            startSvcPolling();
+        }
+        window.selectSvcTab = selectSvcTab;
+
+        function _calcSvcHealth(states, hosts) {
+            // bad → red:   хоть одна нода Stopped / Unreachable / Not Found / Unknown
+            // warn → yellow: хоть одна Stopping (и нет bad)
+            // ok → green:  все Running / Starting
+            const list = hosts.map(h => states[h] || 'unknown');
+            if (list.some(s => ['stopped', 'unreachable', 'not_found', 'unknown'].includes(s))) return 'bad';
+            if (list.some(s => s === 'stopping')) return 'warn';
+            return 'ok';
+        }
+
+        async function fetchSvcStatuses() {
+            if (!_svcSelected) return;
+            const hosts = (_svcIndex[_svcSelected] || []).map(h => h.host);
+            if (!hosts.length) return;
+            try {
+                const resp = await fetch('/api/ms/svc-status', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({service: _svcSelected, nodes: hosts}),
+                });
+                if (!resp.ok) {
+                    hosts.forEach(h => { _svcStatuses[h] = 'unreachable'; _svcVersions[h] = ''; });
+                } else {
+                    const data = await resp.json();
+                    const states = data.statuses || {};
+                    const vers   = data.versions || {};
+                    hosts.forEach(h => {
+                        _svcStatuses[h] = states[h] || 'unreachable';
+                        _svcVersions[h] = vers[h] || '';
+                    });
+                }
+            } catch {
+                hosts.forEach(h => { _svcStatuses[h] = 'unreachable'; _svcVersions[h] = ''; });
+            }
+            _svcHealth[_svcSelected] = _calcSvcHealth(_svcStatuses, hosts);
+            // Параллельно — реальное состояние «в ротации» из nginx (только для балансируемых)
+            if (!NOT_BALANCED_SVCS.has(_svcSelected)) {
+                try {
+                    const r = await fetch('/api/svc/rotation', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({queries: [{service: _svcSelected, hosts}]}),
+                    });
+                    if (r.ok) {
+                        const d = await r.json();
+                        _svcRotation[_svcSelected] = (d.results || {})[_svcSelected] || {};
+                    }
+                } catch {}
+            }
+            renderSvcContent();
+            renderSvcSidebar();
+        }
+
+        async function fetchAllSvcHealth() {
+            const services = Object.keys(_svcIndex || {});
+            if (!services.length) return;
+            const queries = services.map(svc => ({
+                service: svc,
+                nodes: (_svcIndex[svc] || []).map(h => h.host),
+            }));
+            try {
+                const resp = await fetch('/api/ms/all-status', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({queries}),
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const results = data.results || {};
+                for (const svc of services) {
+                    const hosts = (_svcIndex[svc] || []).map(h => h.host);
+                    const states = results[svc] || {};
+                    const localStates = {};
+                    hosts.forEach(h => { localStates[h] = states[h] || 'unreachable'; });
+                    _svcHealth[svc] = _calcSvcHealth(localStates, hosts);
+                }
+                renderSvcSidebar();
+            } catch {}
+        }
+
+        function startSvcAllHealthPoll() {
+            if (_svcAllPollActive) return;
+            _svcAllPollActive = true;
+            // один опрос при заходе на страницу
+            fetchAllSvcHealth();
+        }
+        function stopSvcAllHealthPoll() {
+            _svcAllPollActive = false;
+        }
+
+        function startSvcPolling() {
+            stopSvcPolling();
+            fetchSvcStatuses();
+            const delay = MS_POLL_INTERVAL_MS - (Date.now() % MS_POLL_INTERVAL_MS);
+            _svcPollTimeout = setTimeout(() => {
+                fetchSvcStatuses();
+                _svcPollTimer = setInterval(fetchSvcStatuses, MS_POLL_INTERVAL_MS);
+            }, delay);
+        }
+        function stopSvcPolling() {
+            if (_svcPollTimer)   { clearInterval(_svcPollTimer);  _svcPollTimer = null; }
+            if (_svcPollTimeout) { clearTimeout(_svcPollTimeout); _svcPollTimeout = null; }
+        }
+
+        function renderSvcContent() {
+            const box = document.getElementById('svcContent');
+            if (!box) return;
+            if (!_svcSelected) {
+                box.innerHTML = '<div class="svc-empty">Выберите сервис</div>';
+                return;
+            }
+            const hosts = _svcIndex[_svcSelected] || [];
+            const byGroup = {};
+            for (const h of hosts) {
+                if (!byGroup[h.group]) byGroup[h.group] = [];
+                byGroup[h.group].push(h.host);
+            }
+            const order = HOST_MS_LIST.map(g => g.group);
+            const renderStatus = (host) => {
+                const state = _svcStatuses[host] || 'unknown';
+                const m = MS_STATUS_MAP[state] || MS_STATUS_MAP.unknown;
+                return `<span class="svc-host-status"><span class="ms-node-dot" style="background:${m.color}"></span>${escapeHtml(m.text)}</span>`;
+            };
+            const safeSvc = _svcSelected.replace(/'/g, "\\'");
+            const isHostChecked = (host) => !!(_svcCheckSel[_svcSelected] && _svcCheckSel[_svcSelected].has(host));
+            const groupsHtml = order.filter(g => byGroup[g]).map(g => {
+                const groupHosts = byGroup[g];
+                const checkedHere = groupHosts.filter(h => isHostChecked(h)).length;
+                const allChecked = checkedHere === groupHosts.length && groupHosts.length > 0;
+                const safeGroup = g.replace(/'/g, "\\'");
+                return `
+                <div class="svc-host-group">
+                    <div class="svc-host-group-title">${escapeHtml(g)}</div>
+                    <div class="svc-host-list">
+                        <div class="svc-host-header">
+                            <input type="checkbox" class="ms-checkbox" data-svc-group="${escapeHtml(g)}"
+                                   ${allChecked ? 'checked' : ''}
+                                   onclick="toggleSvcGroup('${safeSvc}', '${safeGroup}', this.checked)"
+                                   title="Выделить всё плечо">
+                            <span>Хост</span>
+                            <span class="col-version">Версия</span>
+                            <span class="col-rotation">В ротации</span>
+                            <span class="col-status">Статус</span>
+                        </div>
+                        ${byGroup[g].map(h => {
+                            const ver = _svcVersions[h] || '';
+                            const isBalanced = !NOT_BALANCED_SVCS.has(_svcSelected);
+                            const inRot = _svcRotation[_svcSelected]?.[h];   // true / false / undefined
+                            let rotCls = 'empty', rotText = '—';
+                            if (isBalanced) {
+                                if (inRot === true)       { rotCls = 'in';  rotText = 'ДА'; }
+                                else if (inRot === false) { rotCls = 'out'; rotText = 'НЕТ'; }
+                                // если данных нет — оставляем «—» (не врём, что в ротации)
+                            }
+                            return `
+                            <div class="svc-host-pill">
+                                <input type="checkbox" class="ms-checkbox" ${isHostChecked(h) ? 'checked' : ''}
+                                       onclick="toggleSvcHost('${safeSvc}', '${h.replace(/'/g, "\\'")}', this.checked)">
+                                <span>${escapeHtml(h)}</span>
+                                <span class="svc-host-version ${ver ? '' : 'empty'}">${ver ? escapeHtml(ver) : '—'}</span>
+                                <span class="svc-host-rotation ${rotCls}">${rotText}</span>
+                                ${renderStatus(h)}
+                            </div>`;
+                        }).join('')}
                     </div>
                 </div>`;
-            const groups = key === 'all' ? MS_GROUPS : MS_GROUPS.filter(g => g.key === key);
-            out.innerHTML = groups.map(groupHtml).join('');
+            }).join('');
+            box.innerHTML = `
+                <div class="svc-content-title">${escapeHtml(_svcSelected)}</div>
+                ${groupsHtml}
+            `;
+            // Indeterminate state for group checkboxes
+            for (const g of order.filter(g => byGroup[g])) {
+                const total = byGroup[g].length;
+                const checked = byGroup[g].filter(h => isHostChecked(h)).length;
+                const cb = box.querySelector(`input[data-svc-group="${CSS.escape(g)}"]`);
+                if (cb) cb.indeterminate = checked > 0 && checked < total;
+            }
         }
-        window.setMsTab = setMsTab;
+
+        function msUpdateSelection() {
+            const sel = document.getElementById('msSelection');
+            if (!sel) return;
+            sel.classList.add('visible');
+            const boxes = document.querySelectorAll('.ms-checkbox[data-ms-node]:checked');
+            msRefreshActionButtons();
+            if (boxes.length === 0) {
+                sel.innerHTML = '';
+                return;
+            }
+            // Группируем по data-ms-group в порядке MS_GROUPS
+            const byGroup = new Map();
+            for (const g of MS_GROUPS) byGroup.set(g.key, []);
+            [...boxes].forEach(b => byGroup.get(b.dataset.msGroup)?.push(b.dataset.msNode));
+            const groupsHtml = MS_GROUPS.filter(g => byGroup.get(g.key).length).map(g => {
+                const pills = byGroup.get(g.key).map(node =>
+                    `<span class="ms-pill">${escapeHtml(node)}</span>`
+                ).join('');
+                return `<span class="ms-sel-group"><span class="ms-sel-group-label">${escapeHtml(g.title)}</span>${pills}</span>`;
+            }).join('');
+            sel.innerHTML = groupsHtml;
+        }
+        window.msUpdateSelection = msUpdateSelection;
+
 
         // ============ DB CONNECTION SETTINGS ============
         async function loadDbSettings() {
@@ -1214,6 +3745,539 @@
         window.testDbConn = testDbConn;
 
         // ============ USERS ============
+        // ============ BALANCER CREDS (admin) ============
+        async function loadBalancerCreds() {
+            const root = document.getElementById('balancerCredsArea');
+            if (!root) return;
+            try {
+                const resp = await fetch('/api/balancer-credentials');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const c = await resp.json();
+                const updatedTxt = c.updated_at
+                    ? `последнее обновление: ${new Date(c.updated_at * 1000).toLocaleString('ru-RU')} (${escapeHtml(c.updated_by || '?')})`
+                    : 'ещё не настроено';
+                root.innerHTML = `
+                    <form id="balancerCredsForm" onsubmit="return saveBalancerCreds(event)" style="max-width:560px">
+                        <div class="muted" style="margin-bottom:14px;font-size:11px">${updatedTxt}</div>
+
+                        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin:6px 0 10px">SSH балансировщика nginx</h3>
+                        <div class="field" style="display:grid;grid-template-columns:1fr 90px;gap:10px">
+                            <div>
+                                <label for="bcSshHost">Хост</label>
+                                <input type="text" id="bcSshHost" autocomplete="off" spellcheck="false" placeholder="balancer.uniservers.ru" value="${escapeHtml(c.ssh_host)}">
+                            </div>
+                            <div>
+                                <label for="bcSshPort">Порт</label>
+                                <input type="text" id="bcSshPort" inputmode="numeric" maxlength="5"
+                                       value="${c.ssh_port}"
+                                       oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 5)">
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="bcSshLogin">Логин</label>
+                            <input type="text" id="bcSshLogin" autocomplete="off" spellcheck="false" value="${escapeHtml(c.ssh_login)}">
+                        </div>
+                        <div class="field">
+                            <label for="bcSshPassword">Пароль ${c.ssh_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                            <input type="password" id="bcSshPassword" autocomplete="new-password" placeholder="${c.ssh_password_set ? '••••••••' : 'введите пароль'}">
+                        </div>
+                        <div class="field">
+                            <label for="bcSshSudoPwd">Пароль для sudo ${c.ssh_sudo_pwd_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                            <input type="password" id="bcSshSudoPwd" autocomplete="new-password" placeholder="${c.ssh_sudo_pwd_set ? '••••••••' : 'введите пароль для sudo'}">
+                            <div class="field-hint">Если sudo без пароля — оставьте пустым</div>
+                        </div>
+
+                        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin:18px 0 10px">NTLM (Inceptum API на нодах)</h3>
+                        <div class="field">
+                            <label for="bcWinLogin">Логин</label>
+                            <input type="text" id="bcWinLogin" autocomplete="off" spellcheck="false" placeholder="PROD-S\\Integration_Service" value="${escapeHtml(c.win_login)}">
+                            <div class="field-hint">Формат <code>ДОМЕН\\Имя</code> для доменной учётки</div>
+                        </div>
+                        <div class="field">
+                            <label for="bcWinPassword">Пароль ${c.win_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                            <input type="password" id="bcWinPassword" autocomplete="new-password" placeholder="${c.win_password_set ? '••••••••' : 'введите пароль'}">
+                        </div>
+
+                        <div class="modal-error" id="bcError"></div>
+                        <div style="display:flex;gap:8px;margin-top:18px;align-items:center">
+                            <button type="submit" class="btn btn-primary" style="min-width:140px;justify-content:center">Сохранить</button>
+                            <button type="button" class="btn btn-ghost" style="min-width:170px;justify-content:center" onclick="testBalancerSsh(this)">Проверить SSH + nginx -t</button>
+                            <span class="muted" id="bcTestResult" style="font-size:12px"></span>
+                        </div>
+                    </form>`;
+            } catch (e) {
+                root.innerHTML = `<div class="muted" style="color:#fca5a5">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+        window.loadBalancerCreds = loadBalancerCreds;
+
+        async function saveBalancerCreds(e) {
+            e.preventDefault();
+            const errBox = document.getElementById('bcError');
+            errBox.classList.remove('show');
+            const body = {
+                ssh_host:     document.getElementById('bcSshHost').value.trim(),
+                ssh_port:     parseInt(document.getElementById('bcSshPort').value, 10) || 22,
+                ssh_login:    document.getElementById('bcSshLogin').value.trim(),
+                ssh_password: document.getElementById('bcSshPassword').value,
+                ssh_sudo_pwd: document.getElementById('bcSshSudoPwd').value,
+                win_login:    document.getElementById('bcWinLogin').value.trim(),
+                win_password: document.getElementById('bcWinPassword').value,
+            };
+            try {
+                const resp = await fetch('/api/balancer-credentials', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body),
+                });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    errBox.textContent = data.error || `Ошибка ${resp.status}`;
+                    errBox.classList.add('show');
+                    return false;
+                }
+                toast('Учётки сохранены', 'ok');
+                loadBalancerCreds();
+            } catch (err) {
+                errBox.textContent = `Сеть: ${err.message}`;
+                errBox.classList.add('show');
+            }
+            return false;
+        }
+        window.saveBalancerCreds = saveBalancerCreds;
+
+        async function testBalancerSsh(btn) {
+            const out = document.getElementById('bcTestResult');
+            btn.disabled = true; out.textContent = 'Проверяю…'; out.style.color = '#9ca3af';
+            try {
+                const resp = await fetch('/api/svc/test-balancer', {method: 'POST'});
+                const data = await resp.json().catch(() => ({}));
+                if (resp.ok && data.ok) {
+                    out.textContent = `✓ ${data.output || 'ok'} (${data.host})`;
+                    out.style.color = '#6ee7b7';
+                } else {
+                    out.textContent = `✗ ${data.error || 'Ошибка ' + resp.status}`;
+                    out.style.color = '#fca5a5';
+                }
+            } catch (e) {
+                out.textContent = `✗ ${e.message}`;
+                out.style.color = '#fca5a5';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        window.testBalancerSsh = testBalancerSsh;
+
+        // ============ NODES CATALOG (admin) ============
+        async function loadNodesCatalog() {
+            const root = document.getElementById('nodesCatalogArea');
+            if (!root) return;
+            try {
+                const [nodesResp, groupsResp] = await Promise.all([
+                    fetch('/api/ms/nodes'),
+                    fetch('/api/ms/groups'),
+                ]);
+                if (!nodesResp.ok) throw new Error(`HTTP ${nodesResp.status}`);
+                if (!groupsResp.ok) throw new Error(`HTTP ${groupsResp.status}`);
+                const data = await nodesResp.json();
+                const groupsList = (await groupsResp.json()).groups || [];
+                const byGroup = {};
+                for (const n of (data.nodes || [])) {
+                    (byGroup[n.group || '—'] ??= []).push(n);
+                }
+                const html = groupsList.map(grp => {
+                    const g = grp.key;
+                    const nodes = byGroup[g] || [];
+                    return `
+                    <div class="ms-group" style="max-width:1100px">
+                        <div class="ms-group-title-row">
+                            <div class="ms-group-title-left">
+                                <div class="ms-group-title">${escapeHtml(grp.title)}</div>
+                                <button type="button" class="ms-add-btn" onclick="openMsNodeAdder('${escapeHtml(g)}')"><span>+</span> Хост</button>
+                                <button type="button" class="svc-clear-btn" onclick="deleteMsGroup('${escapeHtml(g)}','${escapeHtml(grp.title)}', ${nodes.length})" style="margin-left:6px">Удалить плечо</button>
+                            </div>
+                        </div>
+                        ${nodes.length === 0
+                            ? '<div class="muted" style="padding:8px 12px;font-size:12px;font-style:italic">В плече нет нод</div>'
+                            : `<table class="ms-cat-table">
+                            <thead><tr>
+                                <th>Ключ</th><th>FQDN / IP</th><th>Роль</th><th></th>
+                            </tr></thead>
+                            <tbody>
+                                ${nodes.map(n => {
+                                    const host = n.host || n.host_default;
+                                    const role = (n.role || '').toLowerCase();
+                                    let roleHtml = '<span class="ms-cat-paths-empty">—</span>';
+                                    if (role === 'master') roleHtml = '<span class="ms-role-badge master">Master</span>';
+                                    else if (role === 'slave') roleHtml = '<span class="ms-role-badge slave">Slave</span>';
+                                    return `
+                                        <tr>
+                                            <td><span class="ms-cat-name">${escapeHtml(n.key)}</span></td>
+                                            <td><span class="ms-cat-path">${escapeHtml(host)}</span></td>
+                                            <td>${roleHtml}</td>
+                                            <td class="ms-cat-actions">
+                                                <button class="icon-btn" title="Редактировать" onclick="(async () => { await openMsNodeEditor('${escapeHtml(n.key)}'); })()">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                </button>
+                                            </td>
+                                        </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>`}
+                    </div>`;
+                }).join('');
+                root.innerHTML = html || '<div class="muted">Нет нод в реестре</div>';
+            } catch (e) {
+                root.innerHTML = `<div class="muted" style="color:#fca5a5">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+        window.loadNodesCatalog = loadNodesCatalog;
+
+        function openMsGroupCreator() {
+            document.getElementById('msGroupKey').value = '';
+            document.getElementById('msGroupTitle').value = '';
+            document.getElementById('msGroupError').classList.remove('show');
+            document.getElementById('msGroupBackdrop').classList.add('open');
+            setTimeout(() => document.getElementById('msGroupKey').focus(), 30);
+        }
+        window.openMsGroupCreator = openMsGroupCreator;
+
+        function closeMsGroupCreator() {
+            document.getElementById('msGroupBackdrop').classList.remove('open');
+        }
+        window.closeMsGroupCreator = closeMsGroupCreator;
+
+        async function saveMsGroup(e) {
+            e.preventDefault();
+            const errBox = document.getElementById('msGroupError');
+            errBox.classList.remove('show');
+            const key   = document.getElementById('msGroupKey').value.trim();
+            const title = document.getElementById('msGroupTitle').value.trim();
+            if (!key || !title) { errBox.textContent = 'Заполните оба поля'; errBox.classList.add('show'); return false; }
+            try {
+                const resp = await fetch('/api/ms/groups', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({key, title}),
+                });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    errBox.textContent = data.error || `Ошибка ${resp.status}`;
+                    errBox.classList.add('show');
+                    return false;
+                }
+                closeMsGroupCreator();
+                loadNodesCatalog();
+            } catch (err) {
+                errBox.textContent = `Сеть: ${err.message}`;
+                errBox.classList.add('show');
+            }
+            return false;
+        }
+        window.saveMsGroup = saveMsGroup;
+
+        async function deleteMsGroup(key, title, nodeCount) {
+            if (nodeCount > 0) {
+                toast(`В плече «${title}» ещё ${nodeCount} нод. Сначала удалите или перенесите их.`, 'err');
+                return;
+            }
+            const ok = await confirmModal({
+                title: `Удалить плечо «${title}»?`,
+                message: 'Действие необратимо. В плече сейчас нет нод.',
+                kind: 'danger',
+                confirmText: 'Удалить',
+                confirmClass: 'btn-danger',
+                compact: true,
+            });
+            if (!ok) return;
+            try {
+                const resp = await fetch(`/api/ms/groups/${encodeURIComponent(key)}`, { method: 'DELETE' });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    toast(data.error || `Ошибка ${resp.status}`, 'err');
+                    return;
+                }
+                loadNodesCatalog();
+            } catch (err) {
+                toast(`Сеть: ${err.message}`, 'err');
+            }
+        }
+        window.deleteMsGroup = deleteMsGroup;
+
+        // ============ MS CATALOG (admin) ============
+        let _msCatList = [];        // [{id, name, paths, nodes, balanced}]
+        let _msCatEditingId = null; // null = create, otherwise id
+
+        async function loadMsCatalog() {
+            const root = document.getElementById('msCatalogArea');
+            if (!root) return;
+            try {
+                const resp = await fetch('/api/catalog/microservices');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                _msCatList = data.microservices || [];
+                renderMsCatalog();
+            } catch (e) {
+                root.innerHTML = `<div class="muted" style="color:#fca5a5">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+        window.loadMsCatalog = loadMsCatalog;
+
+        function renderMsCatalog() {
+            const root = document.getElementById('msCatalogArea');
+            if (!root) return;
+            if (!_msCatList.length) {
+                root.innerHTML = '<div class="muted">Микросервисы ещё не добавлены.</div>';
+                return;
+            }
+            const rows = _msCatList.map(ms => {
+                const pathsHtml = ms.paths.length
+                    ? ms.paths.map(p => `<span class="ms-cat-path">${escapeHtml(p)}</span>`).join('')
+                    : '<span class="ms-cat-paths-empty">не балансируется</span>';
+                const nodePillsHtml = ms.nodes.length
+                    ? ms.nodes.map(n => `<span class="ms-cat-node-pill">${escapeHtml(n)}</span>`).join('')
+                    : '<span class="ms-cat-paths-empty">нет</span>';
+                const balCls = ms.balanced ? 'yes' : 'no';
+                const balText = ms.balanced ? `⚖ Да (${ms.paths.length} конф.)` : '— Нет';
+                return `
+                    <tr>
+                        <td><span class="ms-cat-name">${escapeHtml(ms.name)}</span></td>
+                        <td><span class="ms-cat-balanced ${balCls}">${balText}</span></td>
+                        <td><div class="ms-cat-paths">${pathsHtml}</div></td>
+                        <td>${ms.nodes.length}</td>
+                        <td><div class="ms-cat-node-pills">${nodePillsHtml}</div></td>
+                        <td class="ms-cat-actions">
+                            <button class="icon-btn" title="Редактировать" onclick="openMsCatalogEditor(${ms.id})">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button class="icon-btn danger" title="Удалить" onclick="deleteMsCatalogRow(${ms.id})">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                            </button>
+                        </td>
+                    </tr>`;
+            }).join('');
+            root.innerHTML = `
+                <table class="ms-cat-table">
+                    <thead><tr>
+                        <th>Имя</th><th>Балансировка</th><th>Пути конфигов</th><th>Нод</th><th>Список нод</th><th></th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`;
+        }
+
+        async function openMsCatalogEditor(id) {
+            _msCatEditingId = id;
+            document.getElementById('msCatError').classList.remove('show');
+            document.getElementById('msCatName').value = '';
+            document.getElementById('msCatPaths').value = '';
+            const cur = id ? _msCatList.find(x => x.id === id) : null;
+            if (cur) {
+                document.getElementById('msCatTitle').textContent = `Редактировать «${cur.name}»`;
+                document.getElementById('msCatName').value = cur.name;
+                document.getElementById('msCatPaths').value = cur.paths.join('\n');
+                document.getElementById('msCatDeleteBtn').style.display = '';
+                document.getElementById('msCatSubmitBtn').textContent = 'Сохранить';
+            } else {
+                document.getElementById('msCatTitle').textContent = 'Новый микросервис';
+                document.getElementById('msCatDeleteBtn').style.display = 'none';
+                document.getElementById('msCatSubmitBtn').textContent = 'Создать';
+            }
+            await renderMsCatalogNodesGrid(cur ? cur.nodes : []);
+            document.getElementById('msCatBackdrop').classList.add('open');
+            setTimeout(() => document.getElementById('msCatName').focus(), 30);
+        }
+        window.openMsCatalogEditor = openMsCatalogEditor;
+
+        let _msCatNodeSel = new Set();
+        let _msCatNodesByGroup = {};
+
+        async function renderMsCatalogNodesGrid(selected) {
+            _msCatNodeSel = new Set(selected || []);
+            const grid = document.getElementById('msCatNodesGrid');
+            if (!grid) return;
+            try {
+                const [nodesResp, groupsResp] = await Promise.all([
+                    fetch('/api/ms/nodes'),
+                    fetch('/api/ms/groups'),
+                ]);
+                if (!nodesResp.ok) throw new Error(`HTTP ${nodesResp.status}`);
+                if (!groupsResp.ok) throw new Error(`HTTP ${groupsResp.status}`);
+                const data = await nodesResp.json();
+                const groups = (await groupsResp.json()).groups || [];
+                _msCatNodesByGroup = {};
+                for (const n of (data.nodes || [])) {
+                    (_msCatNodesByGroup[n.group || '—'] ??= []).push(n.key);
+                }
+                const html = groups.filter(grp => _msCatNodesByGroup[grp.key]).map(grp => {
+                    const g = grp.key;
+                    const keys = _msCatNodesByGroup[g];
+                    return `
+                        <div class="ms-cat-group" data-group="${escapeHtml(g)}">
+                            <div class="ms-cat-group-head">
+                                <span class="ms-cat-group-name">${escapeHtml(grp.title)}</span>
+                                <span class="ms-cat-group-count" data-group-count="${escapeHtml(g)}">0 / ${keys.length}</span>
+                                <button type="button" class="ms-cat-group-allbtn"
+                                        data-group-toggle="${escapeHtml(g)}" data-state="none"
+                                        onclick="msCatToggleGroupBtn('${escapeHtml(g)}')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline class="icon-check" points="20 6 9 17 4 12"/>
+                                        <line class="icon-x" x1="6" y1="6" x2="18" y2="18"/>
+                                        <line class="icon-x" x1="18" y1="6" x2="6" y2="18"/>
+                                    </svg>
+                                    <span class="label-default">Выбрать все</span>
+                                    <span class="label-clear">Снять все</span>
+                                </button>
+                            </div>
+                            <div class="ms-cat-pills">
+                                ${keys.map(k => `
+                                    <button type="button" class="ms-cat-pill ${_msCatNodeSel.has(k) ? 'checked' : ''}"
+                                            data-node-key="${escapeHtml(k)}" data-node-group="${escapeHtml(g)}"
+                                            onclick="msCatTogglePill(this)">
+                                        ${escapeHtml(k)}
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>`;
+                }).join('');
+                grid.innerHTML = html || '<div class="muted">Нет зарегистрированных нод</div>';
+                msCatRefreshGroupCounters();
+            } catch (e) {
+                grid.innerHTML = `<div class="muted" style="color:#fca5a5">Не удалось загрузить ноды: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function msCatTogglePill(btn) {
+            const k = btn.dataset.nodeKey;
+            if (_msCatNodeSel.has(k)) {
+                _msCatNodeSel.delete(k);
+                btn.classList.remove('checked');
+            } else {
+                _msCatNodeSel.add(k);
+                btn.classList.add('checked');
+            }
+            msCatRefreshGroupCounters();
+        }
+        window.msCatTogglePill = msCatTogglePill;
+
+        function msCatToggleGroupBtn(group) {
+            const keys = _msCatNodesByGroup[group] || [];
+            if (!keys.length) return;
+            const allChecked = keys.every(k => _msCatNodeSel.has(k));
+            const newChecked = !allChecked;
+            keys.forEach(k => {
+                if (newChecked) _msCatNodeSel.add(k);
+                else            _msCatNodeSel.delete(k);
+            });
+            document.querySelectorAll(`.ms-cat-pill[data-node-group="${group}"]`).forEach(p => {
+                p.classList.toggle('checked', newChecked);
+            });
+            msCatRefreshGroupCounters();
+        }
+        window.msCatToggleGroupBtn = msCatToggleGroupBtn;
+
+        function msCatRefreshGroupCounters() {
+            for (const g of Object.keys(_msCatNodesByGroup)) {
+                const keys = _msCatNodesByGroup[g];
+                const checked = keys.filter(k => _msCatNodeSel.has(k)).length;
+                const total = keys.length;
+                const counter = document.querySelector(`[data-group-count="${g}"]`);
+                if (counter) counter.textContent = `${checked} / ${total}`;
+                const btn = document.querySelector(`button[data-group-toggle="${g}"]`);
+                if (btn) {
+                    let state = 'none';
+                    if (checked === total && total > 0) state = 'all';
+                    else if (checked > 0) state = 'some';
+                    btn.dataset.state = state;
+                }
+            }
+        }
+
+        function closeMsCatalogEditor() {
+            document.getElementById('msCatBackdrop').classList.remove('open');
+            _msCatEditingId = null;
+        }
+        window.closeMsCatalogEditor = closeMsCatalogEditor;
+
+        async function saveMsCatalog(e) {
+            e.preventDefault();
+            const errBox = document.getElementById('msCatError');
+            errBox.classList.remove('show');
+            const name = document.getElementById('msCatName').value.trim();
+            const pathsRaw = document.getElementById('msCatPaths').value;
+            const paths = pathsRaw.split('\n').map(s => s.trim()).filter(Boolean);
+            const nodes = [..._msCatNodeSel];
+            try {
+                const url = _msCatEditingId
+                    ? `/api/catalog/microservices/${_msCatEditingId}`
+                    : '/api/catalog/microservices';
+                const method = _msCatEditingId ? 'PATCH' : 'POST';
+                const resp = await fetch(url, {
+                    method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, paths, nodes}),
+                });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    errBox.textContent = data.error || `Ошибка ${resp.status}`;
+                    errBox.classList.add('show');
+                    return false;
+                }
+                closeMsCatalogEditor();
+                await loadMsCatalog();
+            } catch (err) {
+                errBox.textContent = `Сеть: ${err.message}`;
+                errBox.classList.add('show');
+            }
+            return false;
+        }
+        window.saveMsCatalog = saveMsCatalog;
+
+        async function deleteMsCatalog() {
+            if (!_msCatEditingId) return;
+            const cur = _msCatList.find(x => x.id === _msCatEditingId);
+            if (!cur) return;
+            const ok = await confirmModal({
+                title: `Удалить «${cur.name}»?`,
+                message: 'Запись о нодах для этого сервиса тоже будет удалена.',
+                kind: 'danger',
+                confirmText: 'Удалить',
+                confirmClass: 'btn-danger',
+                compact: true,
+            });
+            if (!ok) return;
+            await deleteMsCatalogRow(_msCatEditingId, true);
+            closeMsCatalogEditor();
+        }
+        window.deleteMsCatalog = deleteMsCatalog;
+
+        async function deleteMsCatalogRow(id, skipConfirm) {
+            if (!skipConfirm) {
+                const cur = _msCatList.find(x => x.id === id);
+                if (!cur) return;
+                const ok = await confirmModal({
+                    title: `Удалить «${cur.name}»?`,
+                    message: 'Запись о нодах для этого сервиса тоже будет удалена.',
+                    kind: 'danger',
+                    confirmText: 'Удалить',
+                    confirmClass: 'btn-danger',
+                    compact: true,
+                });
+                if (!ok) return;
+            }
+            try {
+                const resp = await fetch(`/api/catalog/microservices/${id}`, { method: 'DELETE' });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    toast(data.error || `Ошибка ${resp.status}`, 'err');
+                    return;
+                }
+                await loadMsCatalog();
+            } catch (err) {
+                toast(`Сеть: ${err.message}`, 'err');
+            }
+        }
+        window.deleteMsCatalogRow = deleteMsCatalogRow;
+
         async function loadUsers() {
             const area = document.getElementById('usersArea');
             area.innerHTML = '<div class="muted">Загрузка…</div>';
