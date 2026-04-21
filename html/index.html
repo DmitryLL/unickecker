@@ -282,6 +282,51 @@
             margin-top: 20px;
         }
 
+        /* ============ MICROSERVICES ============ */
+        .ms-tabs {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding-bottom: 8px;
+        }
+        .ms-tab {
+            padding: 6px 14px; font-size: 13px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            color: #cbd5e1; cursor: pointer; font-family: inherit;
+            transition: background 0.12s, color 0.12s, border-color 0.12s;
+        }
+        .ms-tab:hover { background: rgba(255, 255, 255, 0.06); color: #f3f4f6; }
+        .ms-tab.active {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: rgba(99, 102, 241, 0.4);
+            color: #c7d2fe; font-weight: 600;
+        }
+        .ms-group { margin-bottom: 22px; }
+        .ms-group:last-child { margin-bottom: 0; }
+        .ms-group-title {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+            color: #6b7280; font-weight: 600; margin-bottom: 8px;
+        }
+        .ms-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+        }
+        .ms-node {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px;
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            font-size: 13px; color: #f3f4f6;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .ms-node-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #6b7280; flex-shrink: 0;
+        }
+
         /* ============ DB CONNECTION FORM ============ */
         .db-list { display: flex; flex-direction: column; gap: 18px; max-width: 720px; }
         .db-form {
@@ -630,6 +675,17 @@
                 </div>
             </section>
 
+            <!-- MICROSERVICES -->
+            <section data-route="microservices">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Микросервисы</h1>
+                    </div>
+                </div>
+                <div class="ms-tabs" id="msTabs"></div>
+                <div class="ms-content" id="msContent"></div>
+            </section>
+
             <!-- DB CONNECTION -->
             <section data-route="db_connection">
                 <div class="page-header">
@@ -693,6 +749,7 @@
         const ICONS = {
             users:         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
             operations:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+            microservices: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
             db_connection: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></svg>',
             about:         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
         };
@@ -785,6 +842,7 @@
             if (route === 'users' && state.me.role === 'admin') loadUsers();
             if (route === 'operations') resetOpResult();
             if (route === 'db_connection' && state.me.role === 'admin') loadDbSettings();
+            if (route === 'microservices') initMicroservices();
         }
 
         // ============ OPERATIONS LOOKUP ============
@@ -968,6 +1026,54 @@
             return false;
         }
         window.opLookup = opLookup;
+
+        // ============ MICROSERVICES ============
+        const MS_GROUPS = [
+            {key: 'gate', title: 'GATE', nodes: [
+                'sr-itlgate101', 'sr-itlgate102', 'sr-itlgate103', 'sr-itlgate104',
+            ]},
+            {key: 'itl', title: 'ITL', nodes: [
+                'sr-itl100', 'sr-itl101', 'sr-itl102', 'sr-itl103', 'sr-itl104', 'sr-itl105',
+                'sr-itl110', 'sr-itl111', 'sr-itl112', 'sr-itl113', 'sr-itl114', 'sr-itl115',
+            ]},
+            {key: 'itlr', title: 'ITLR', nodes: [
+                'sr-itlr100', 'sr-itlr101', 'sr-itlr102', 'sr-itlr103',
+            ]},
+            {key: 'btl', title: 'BTL', nodes: [
+                'sr-btlapp101',
+            ]},
+        ];
+        let msActiveTab = 'all';
+
+        function initMicroservices() {
+            const tabs = document.getElementById('msTabs');
+            if (tabs && !tabs.dataset.built) {
+                const allBtns = [{key: 'all', title: 'Все микросервисы'}, ...MS_GROUPS];
+                tabs.innerHTML = allBtns.map(t =>
+                    `<button class="ms-tab" data-ms-tab="${escapeHtml(t.key)}" onclick="setMsTab('${escapeHtml(t.key)}')">${escapeHtml(t.title)}</button>`
+                ).join('');
+                tabs.dataset.built = '1';
+            }
+            setMsTab(msActiveTab);
+        }
+
+        function setMsTab(key) {
+            msActiveTab = key;
+            document.querySelectorAll('#msTabs .ms-tab').forEach(b => {
+                b.classList.toggle('active', b.dataset.msTab === key);
+            });
+            const out = document.getElementById('msContent');
+            const groupHtml = (g) => `
+                <div class="ms-group">
+                    <div class="ms-group-title">${escapeHtml(g.title)} · ${g.nodes.length}</div>
+                    <div class="ms-grid">
+                        ${g.nodes.map(n => `<div class="ms-node"><span class="ms-node-dot"></span>${escapeHtml(n)}</div>`).join('')}
+                    </div>
+                </div>`;
+            const groups = key === 'all' ? MS_GROUPS : MS_GROUPS.filter(g => g.key === key);
+            out.innerHTML = groups.map(groupHtml).join('');
+        }
+        window.setMsTab = setMsTab;
 
         // ============ DB CONNECTION SETTINGS ============
         async function loadDbSettings() {

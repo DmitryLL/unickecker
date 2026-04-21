@@ -34,6 +34,7 @@ SESSION_TTL = 60 * 60 * 24 * 7
 # ===== Route registry =====
 ROUTES = [
     {"key": "operations",    "title": "Статусы операций",  "group": "main"},
+    {"key": "microservices", "title": "Микросервисы",      "group": "main"},
     {"key": "users",         "title": "Пользователи",      "group": "settings", "admin_only": True},
     {"key": "db_connection", "title": "Подключение к БД",  "group": "settings", "admin_only": True},
     {"key": "about",         "title": "О программе",       "group": "settings", "always": True},
