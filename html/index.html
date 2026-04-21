@@ -432,7 +432,16 @@
             display: flex; gap: 14px; align-items: flex-start;
             max-width: 1400px;
         }
-        .ms-content { flex: 0 0 auto; }
+        .ms-content {
+            flex: 0 0 auto;
+            display: flex; gap: 14px;
+            align-items: flex-start;
+        }
+        .ms-content .ms-col {
+            display: flex; flex-direction: column; gap: 12px;
+            flex: 0 0 380px;
+        }
+        .ms-content .ms-group { margin-bottom: 0; }
         .ms-console-wrap {
             flex: 1 1 auto; min-width: 320px;
             display: flex; flex-direction: column;
@@ -483,7 +492,7 @@
         }
         .ms-group-title-row {
             display: flex; align-items: center; justify-content: space-between;
-            max-width: 720px; margin-bottom: 8px; gap: 12px;
+            max-width: 380px; margin-bottom: 6px; gap: 8px;
         }
         .ms-group-title-left {
             display: flex; align-items: center; gap: 10px;
@@ -992,6 +1001,39 @@
             line-height: 1.5;
         }
         .stunnel-output:empty { display: none; }
+
+        /* === Блок учётных карточек === */
+        .cred-card {
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 14px;
+            box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+        }
+        .cred-card:last-of-type { margin-bottom: 0; }
+        .cred-card-head {
+            display: flex; align-items: flex-start; gap: 12px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .cred-card-icon {
+            font-size: 22px;
+            flex-shrink: 0;
+            width: 36px; height: 36px;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 9px;
+        }
+        .cred-card-title {
+            font-size: 13px; font-weight: 600; color: #f3f4f6;
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .cred-card-sub {
+            font-size: 11px; color: #6b7280; margin-top: 2px;
+        }
         .svc-console-box .ms-console-header {
             display: flex; align-items: center; justify-content: space-between;
             padding: 8px 12px;
@@ -1060,9 +1102,17 @@
             font-size: 13px;
             font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
         }
-        .svc-host-pill > span:nth-child(2) {
+        .svc-host-pill > span:nth-child(2),
+        .svc-host-pill > .svc-host-link {
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
         }
+        .svc-host-link {
+            color: #f3f4f6;
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.12s;
+        }
+        .svc-host-link:hover { color: #c7d2fe; }
         .svc-host-pill .svc-host-version {
             font-size: 12px;
             color: #cbd5e1;
@@ -1089,7 +1139,7 @@
         }
         .ms-poll-indicator #msPollTime { color: #cbd5e1; font-variant-numeric: tabular-nums; }
         .ms-table {
-            width: 100%; max-width: 720px;
+            width: 100%; max-width: 380px;
             table-layout: fixed;
             border-collapse: separate; border-spacing: 0;
             background: rgba(17, 24, 39, 0.6);
@@ -1097,15 +1147,15 @@
             border-radius: 10px; overflow: hidden;
         }
         .ms-table th, .ms-table td {
-            padding: 8px 14px; text-align: left;
+            padding: 7px 10px; text-align: left;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            font-size: 13px;
+            font-size: 12px;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .ms-table th:nth-child(1), .ms-table td:nth-child(1) { width: 38px; text-align: center; padding-left: 12px; padding-right: 6px; }
-        .ms-table th:nth-child(2), .ms-table td:nth-child(2) { width: 28%; text-align: left; }
-        .ms-table th:nth-child(3), .ms-table td:nth-child(3) { width: 56%; text-align: center; }
-        .ms-table th:nth-child(4), .ms-table td:nth-child(4) { width: 16%; text-align: center; padding-left: 4px; padding-right: 12px; }
+        .ms-table th:nth-child(1), .ms-table td:nth-child(1) { width: 32px; text-align: center; padding-left: 8px; padding-right: 4px; }
+        .ms-table th:nth-child(2), .ms-table td:nth-child(2) { width: 130px; text-align: left; }
+        .ms-table th:nth-child(3), .ms-table td:nth-child(3) { width: auto; text-align: center; }
+        .ms-table th:nth-child(4), .ms-table td:nth-child(4) { width: 40px; text-align: center; padding-left: 2px; padding-right: 8px; }
         .ms-edit-btn {
             display: inline-flex; align-items: center; justify-content: center;
             width: 28px; height: 28px;
@@ -1125,10 +1175,9 @@
         .ms-controls {
             display: flex;
             gap: 10px;
-            align-items: stretch;
+            align-items: center;
             margin-bottom: 14px;
             max-width: 1080px;
-            min-height: 200px;
         }
         .ms-selection {
             display: flex;
@@ -1144,13 +1193,12 @@
             min-height: 200px;
         }
         .ms-actions {
-            display: flex; flex-direction: column; gap: 8px;
-            flex-shrink: 0;
-            padding: 10px 14px;
+            display: flex; flex-direction: row; gap: 8px;
+            align-items: center; flex-wrap: wrap;
+            padding: 8px 12px;
             background: rgba(17, 24, 39, 0.6);
             border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 10px;
-            min-height: 200px;
             justify-content: center;
         }
         .ms-action-btn {
@@ -1624,20 +1672,28 @@
             <!-- MICROSERVICES -->
             <section data-route="services">
                 <div class="ms-controls">
-                    <div class="ms-selection" id="msSelection"></div>
                     <div class="ms-actions">
                         <button class="ms-action-btn stop" onclick="msAction('stop')">Выключить Inceptum</button>
                         <button class="ms-action-btn start" onclick="msAction('start')">Включить Inceptum</button>
                         <button class="ms-action-btn restart" onclick="msAction('restart')">Перезагрузить Inceptum</button>
+                        <button type="button" class="svc-tool-btn" onclick="msRefreshNow(this)" title="Заново опросить статусы всех нод (раз в 3 секунды)">⟳ Обновить статусы</button>
                     </div>
                 </div>
                 <div class="ms-main">
                     <div class="ms-content" id="msContent"></div>
                     <div class="ms-console-wrap">
-                        <div class="ms-console-header">
-                            <span class="ms-console-title">Консоль</span>
+                        <div class="svc-console-half">
+                            <div class="ms-console-header">
+                                <span class="ms-console-title">Лог действий</span>
+                            </div>
+                            <div class="ms-console" id="msConsole"></div>
                         </div>
-                        <div class="ms-console" id="msConsole"></div>
+                        <div class="svc-console-half svc-console-errors-half">
+                            <div class="ms-console-header">
+                                <span class="ms-console-title" style="color:#fca5a5">Лог ошибок</span>
+                            </div>
+                            <div class="ms-console" id="msConsoleErrors"></div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -2352,7 +2408,7 @@
                         ${idx === 0 ? `<div class="ms-poll-indicator">Опрошено: <span id="msPollTime">—</span></div>` : ''}
                     </div>`;
                 return `
-                <div class="ms-group">
+                <div class="ms-group" data-group="${escapeHtml(g.key)}">
                     ${titleBlock}
                     <table class="ms-table">
                         <thead><tr>
@@ -2363,7 +2419,21 @@
                     </table>
                 </div>`;
             };
-            out.innerHTML = MS_GROUPS.map((g, i) => groupHtml(g, i)).join('');
+            // Раскладка: ITL 1 + ITL 2 — в левой колонке, остальное (GATE, ITLR, BTL) — в правой,
+            // в правой колонке группы прижимаются друг к другу без зазоров от высоты левой.
+            const leftKeys  = new Set(['itl1', 'itl2']);
+            const rightKeys = ['gate', 'itlr', 'btl'];
+            const leftGroups  = MS_GROUPS.filter(g => leftKeys.has(g.key));
+            const rightGroups = rightKeys
+                .map(k => MS_GROUPS.find(g => g.key === k))
+                .filter(Boolean);
+            let runningIdx = 0;
+            const renderCol = (groups) =>
+                groups.map(g => groupHtml(g, runningIdx++)).join('');
+            out.innerHTML = `
+                <div class="ms-col">${renderCol(leftGroups)}</div>
+                <div class="ms-col">${renderCol(rightGroups)}</div>
+            `;
         }
 
         let _msConsoleRO = null;
@@ -2416,12 +2486,15 @@
         let msConsoleTimer = null;
 
         function msConsoleAppendEntry(entry) {
-            const box = document.getElementById('msConsole');
+            const lvl = (entry.level || '').toLowerCase();
+            const box = (lvl === 'err' || lvl === 'warn')
+                ? document.getElementById('msConsoleErrors')
+                : document.getElementById('msConsole');
             if (!box) return;
             const nearTop = box.scrollTop < 40;
             const ts = new Date(entry.ts * 1000).toLocaleTimeString('ru-RU', { hour12: false });
             const line = document.createElement('div');
-            line.className = `ms-console-line ${entry.level || ''}`;
+            line.className = `ms-console-line ${lvl || ''}`;
             const userTag = entry.username
                 ? `<span class="user">[${escapeHtml(entry.username)}]</span>`
                 : '';
@@ -2465,9 +2538,10 @@
         }
 
         function msConsoleClear() {
-            const box = document.getElementById('msConsole');
-            if (!box) return;
-            box.innerHTML = '';
+            const a = document.getElementById('msConsole');
+            const b = document.getElementById('msConsoleErrors');
+            if (a) a.innerHTML = '';
+            if (b) b.innerHTML = '';
         }
         window.msConsoleClear = msConsoleClear;
 
@@ -2564,16 +2638,38 @@
         window.msRefreshActionButtons = msRefreshActionButtons;
 
         function msStartPolling() {
+            // Без авто-обновления: один опрос при заходе/перезагрузке страницы.
+            // Дальше — только по кнопке «Обновить» или после действия.
             msAllNodes = [...document.querySelectorAll('.ms-checkbox[data-ms-node]')].map(cb => cb.dataset.msNode);
             if (msPollTimer)   { clearInterval(msPollTimer);   msPollTimer = null; }
             if (msPollTimeout) { clearTimeout(msPollTimeout);  msPollTimeout = null; }
-            const delay = MS_POLL_INTERVAL_MS - (Date.now() % MS_POLL_INTERVAL_MS);
-            msPollTimeout = setTimeout(() => {
-                msPollStatuses();
-                msPollTimer = setInterval(msPollStatuses, MS_POLL_INTERVAL_MS);
-            }, delay);
+            msPollStatuses();
         }
         window.msStartPolling = msStartPolling;
+
+        async function msRefreshNow(btn) {
+            if (!btn || btn.disabled) return;
+            const orig = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Опрашиваю…';
+            try {
+                await msPollStatuses();
+            } catch {}
+            // 3-секундный cooldown — нельзя дёргать чаще
+            let left = 3;
+            btn.textContent = `Подождите ${left}с`;
+            const tick = setInterval(() => {
+                left -= 1;
+                if (left > 0) {
+                    btn.textContent = `Подождите ${left}с`;
+                } else {
+                    clearInterval(tick);
+                    btn.textContent = orig;
+                    btn.disabled = false;
+                }
+            }, 1000);
+        }
+        window.msRefreshNow = msRefreshNow;
 
         async function msAction(action) {
             const boxes = document.querySelectorAll('.ms-checkbox[data-ms-node]:checked');
@@ -2938,6 +3034,8 @@
         // Selection across services: {service: Set(hostKey)}
         const _svcCheckSel = {};
 
+        let HOST_FQDN = {};   // {host_key: fqdn} — берётся из «Каталога нод»
+
         async function loadHostMsCatalog() {
             try {
                 const [nodesResp, catResp, groupsResp] = await Promise.all([
@@ -2950,7 +3048,11 @@
                 const services = (await catResp.json()).microservices || [];
                 const groups = (await groupsResp.json()).groups || [];
                 const nodesByGroup = {};
-                for (const n of nodes) (nodesByGroup[n.group || ''] ??= []).push(n.key);
+                HOST_FQDN = {};
+                for (const n of nodes) {
+                    (nodesByGroup[n.group || ''] ??= []).push(n.key);
+                    HOST_FQDN[n.key] = n.host || n.host_default || n.key;
+                }
                 const hostServices = {};
                 for (const svc of services) {
                     for (const h of (svc.nodes || [])) (hostServices[h] ??= new Set()).add(svc.name);
@@ -3020,13 +3122,13 @@
                     <div class="svc-console-box">
                         <div class="svc-console-half">
                             <div class="ms-console-header">
-                                <span class="ms-console-title">Консоль действий</span>
+                                <span class="ms-console-title">Лог действий</span>
                             </div>
                             <div class="ms-console" id="svcConsole"></div>
                         </div>
                         <div class="svc-console-half svc-console-errors-half">
                             <div class="ms-console-header">
-                                <span class="ms-console-title" style="color:#fca5a5">Консоль ошибок</span>
+                                <span class="ms-console-title" style="color:#fca5a5">Лог ошибок</span>
                             </div>
                             <div class="ms-console" id="svcConsoleErrors"></div>
                         </div>
@@ -3625,7 +3727,7 @@
                             <div class="svc-host-pill">
                                 <input type="checkbox" class="ms-checkbox" ${isHostChecked(h) ? 'checked' : ''}
                                        onclick="toggleSvcHost('${safeSvc}', '${h.replace(/'/g, "\\'")}', this.checked)">
-                                <span>${escapeHtml(h)}</span>
+                                <a class="svc-host-link" href="http://${encodeURI(HOST_FQDN[h] || h)}:9223" target="_blank" rel="noopener noreferrer" title="Открыть http://${escapeHtml(HOST_FQDN[h] || h)}:9223">${escapeHtml(h)}</a>
                                 <span class="svc-host-version ${ver ? '' : 'empty'}">${ver ? escapeHtml(ver) : '—'}</span>
                                 <span class="svc-host-rotation ${rotCls}">${rotText}</span>
                                 ${renderStatus(h)}
@@ -3648,11 +3750,12 @@
         }
 
         function msUpdateSelection() {
+            // Кнопки действий обновляем всегда, даже без панели #msSelection
+            msRefreshActionButtons();
             const sel = document.getElementById('msSelection');
             if (!sel) return;
             sel.classList.add('visible');
             const boxes = document.querySelectorAll('.ms-checkbox[data-ms-node]:checked');
-            msRefreshActionButtons();
             if (boxes.length === 0) {
                 sel.innerHTML = '';
                 return;
@@ -3915,105 +4018,155 @@
                     ? `последнее обновление: ${new Date(c.updated_at * 1000).toLocaleString('ru-RU')} (${escapeHtml(c.updated_by || '?')})`
                     : 'ещё не настроено';
                 root.innerHTML = `
-                    <form id="balancerCredsForm" onsubmit="return saveBalancerCreds(event)" style="max-width:560px">
+                    <div style="max-width:640px">
                         <div class="muted" style="margin-bottom:14px;font-size:11px">${updatedTxt}</div>
 
-                        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin:6px 0 10px">SSH балансировщика nginx</h3>
-                        <div class="field" style="display:grid;grid-template-columns:1fr 90px;gap:10px">
-                            <div>
-                                <label for="bcSshHost">Хост</label>
-                                <input type="text" id="bcSshHost" autocomplete="off" spellcheck="false" placeholder="balancer.uniservers.ru" value="${escapeHtml(c.ssh_host)}">
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">🔗</span>
+                                <div>
+                                    <div class="cred-card-title">SSH к балансировщику nginx</div>
+                                    <div class="cred-card-sub">Для drain/return микросервисов и reload nginx</div>
+                                </div>
                             </div>
-                            <div>
-                                <label for="bcSshPort">Порт</label>
-                                <input type="text" id="bcSshPort" inputmode="numeric" maxlength="5"
-                                       value="${c.ssh_port}"
-                                       oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 5)">
+                            <div class="field" style="display:grid;grid-template-columns:1fr 90px;gap:10px">
+                                <div>
+                                    <label for="bcSshHost">Хост</label>
+                                    <input type="text" id="bcSshHost" autocomplete="off" spellcheck="false" placeholder="balancer.uniservers.ru" value="${escapeHtml(c.ssh_host)}">
+                                </div>
+                                <div>
+                                    <label for="bcSshPort">Порт</label>
+                                    <input type="text" id="bcSshPort" inputmode="numeric" maxlength="5"
+                                           value="${c.ssh_port}"
+                                           oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 5)">
+                                </div>
                             </div>
-                        </div>
-                        <div class="field">
-                            <label for="bcSshLogin">Логин</label>
-                            <input type="text" id="bcSshLogin" autocomplete="off" spellcheck="false" value="${escapeHtml(c.ssh_login)}">
-                        </div>
-                        <div class="field">
-                            <label for="bcSshPassword">Пароль ${c.ssh_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
-                            <input type="password" id="bcSshPassword" autocomplete="new-password" placeholder="${c.ssh_password_set ? '••••••••' : 'введите пароль'}">
-                        </div>
-                        <div class="field">
-                            <label for="bcSshSudoPwd">Пароль для sudo ${c.ssh_sudo_pwd_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
-                            <input type="password" id="bcSshSudoPwd" autocomplete="new-password" placeholder="${c.ssh_sudo_pwd_set ? '••••••••' : 'введите пароль для sudo'}">
-                            <div class="field-hint">Если sudo без пароля — оставьте пустым</div>
+                            <div class="field">
+                                <label for="bcSshLogin">Логин</label>
+                                <input type="text" id="bcSshLogin" autocomplete="off" spellcheck="false" value="${escapeHtml(c.ssh_login)}">
+                            </div>
+                            <div class="field">
+                                <label for="bcSshPassword">Пароль ${c.ssh_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="bcSshPassword" autocomplete="new-password" placeholder="${c.ssh_password_set ? '••••••••' : 'введите пароль'}">
+                            </div>
+                            <div class="field" style="margin-bottom:0">
+                                <label for="bcSshSudoPwd">Пароль для sudo ${c.ssh_sudo_pwd_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="bcSshSudoPwd" autocomplete="new-password" placeholder="${c.ssh_sudo_pwd_set ? '••••••••' : 'введите пароль для sudo'}">
+                                <div class="field-hint">Если sudo без пароля — оставьте пустым</div>
+                            </div>
+                            <div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">
+                                <button type="button" class="btn btn-primary" style="min-width:120px;justify-content:center" onclick="saveCredCard('ssh', this)">Сохранить</button>
+                                <button type="button" class="btn btn-ghost" style="min-width:170px;justify-content:center" onclick="testBalancerSsh(this)">Проверить SSH + nginx -t</button>
+                                <span class="muted" id="bcTestResult" style="font-size:12px"></span>
+                            </div>
                         </div>
 
-                        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin:18px 0 10px">NTLM (Inceptum API на нодах)</h3>
-                        <div class="field">
-                            <label for="bcWinLogin">Логин</label>
-                            <input type="text" id="bcWinLogin" autocomplete="off" spellcheck="false" placeholder="PROD-S\\Integration_Service" value="${escapeHtml(c.win_login)}">
-                            <div class="field-hint">Формат <code>ДОМЕН\\Имя</code> для доменной учётки</div>
-                        </div>
-                        <div class="field">
-                            <label for="bcWinPassword">Пароль ${c.win_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
-                            <input type="password" id="bcWinPassword" autocomplete="new-password" placeholder="${c.win_password_set ? '••••••••' : 'введите пароль'}">
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">🪟</span>
+                                <div>
+                                    <div class="cred-card-title">NTLM (Inceptum API на нодах)</div>
+                                    <div class="cred-card-sub">Опрос статуса и команды Start/Stop на :9223</div>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label for="bcWinLogin">Логин</label>
+                                <input type="text" id="bcWinLogin" autocomplete="off" spellcheck="false" placeholder="PROD-S\\Integration_Service" value="${escapeHtml(c.win_login)}">
+                                <div class="field-hint">Формат <code>ДОМЕН\\Имя</code> для доменной учётки</div>
+                            </div>
+                            <div class="field" style="margin-bottom:0">
+                                <label for="bcWinPassword">Пароль ${c.win_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="bcWinPassword" autocomplete="new-password" placeholder="${c.win_password_set ? '••••••••' : 'введите пароль'}">
+                            </div>
+                            <div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">
+                                <button type="button" class="btn btn-primary" style="min-width:120px;justify-content:center" onclick="saveCredCard('ntlm', this)">Сохранить</button>
+                                <button type="button" class="btn btn-ghost" style="min-width:200px;justify-content:center" onclick="testCred('ntlm', this, 'bcNtlmTestResult')">Проверить NTLM (Inceptum)</button>
+                                <span class="muted" id="bcNtlmTestResult" style="font-size:12px"></span>
+                            </div>
                         </div>
 
-                        <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin:18px 0 10px">SSH к stunnel-серверу</h3>
-                        <div class="field" style="display:grid;grid-template-columns:1fr 90px;gap:10px">
-                            <div>
-                                <label for="bcStunnelHost">Хост</label>
-                                <input type="text" id="bcStunnelHost" autocomplete="off" spellcheck="false" placeholder="stunnel.uniservers.ru" value="${escapeHtml(c.stunnel_host || '')}">
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">🛡️</span>
+                                <div>
+                                    <div class="cred-card-title">SSH к stunnel-серверу</div>
+                                    <div class="cred-card-sub">Управление службой stunnel (вкладка «Stunnel»)</div>
+                                </div>
                             </div>
-                            <div>
-                                <label for="bcStunnelPort">Порт</label>
-                                <input type="text" id="bcStunnelPort" inputmode="numeric" maxlength="5"
-                                       value="${c.stunnel_port || 22}"
-                                       oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 5)">
+                            <div class="field" style="display:grid;grid-template-columns:1fr 90px;gap:10px">
+                                <div>
+                                    <label for="bcStunnelHost">Хост</label>
+                                    <input type="text" id="bcStunnelHost" autocomplete="off" spellcheck="false" placeholder="stunnel.uniservers.ru" value="${escapeHtml(c.stunnel_host || '')}">
+                                </div>
+                                <div>
+                                    <label for="bcStunnelPort">Порт</label>
+                                    <input type="text" id="bcStunnelPort" inputmode="numeric" maxlength="5"
+                                           value="${c.stunnel_port || 22}"
+                                           oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 5)">
+                                </div>
                             </div>
-                        </div>
-                        <div class="field">
-                            <label for="bcStunnelLogin">Логин</label>
-                            <input type="text" id="bcStunnelLogin" autocomplete="off" spellcheck="false" value="${escapeHtml(c.stunnel_login || '')}">
-                        </div>
-                        <div class="field">
-                            <label for="bcStunnelPassword">Пароль ${c.stunnel_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
-                            <input type="password" id="bcStunnelPassword" autocomplete="new-password" placeholder="${c.stunnel_password_set ? '••••••••' : 'введите пароль'}">
-                        </div>
-                        <div class="field">
-                            <label for="bcStunnelSudoPwd">Пароль для sudo ${c.stunnel_sudo_pwd_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
-                            <input type="password" id="bcStunnelSudoPwd" autocomplete="new-password" placeholder="${c.stunnel_sudo_pwd_set ? '••••••••' : 'введите пароль для sudo'}">
-                            <div class="field-hint">Если sudo без пароля — оставьте пустым</div>
+                            <div class="field">
+                                <label for="bcStunnelLogin">Логин</label>
+                                <input type="text" id="bcStunnelLogin" autocomplete="off" spellcheck="false" value="${escapeHtml(c.stunnel_login || '')}">
+                            </div>
+                            <div class="field">
+                                <label for="bcStunnelPassword">Пароль ${c.stunnel_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="bcStunnelPassword" autocomplete="new-password" placeholder="${c.stunnel_password_set ? '••••••••' : 'введите пароль'}">
+                            </div>
+                            <div class="field" style="margin-bottom:0">
+                                <label for="bcStunnelSudoPwd">Пароль для sudo ${c.stunnel_sudo_pwd_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="bcStunnelSudoPwd" autocomplete="new-password" placeholder="${c.stunnel_sudo_pwd_set ? '••••••••' : 'введите пароль для sudo'}">
+                                <div class="field-hint">Если sudo без пароля — оставьте пустым</div>
+                            </div>
+                            <div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">
+                                <button type="button" class="btn btn-primary" style="min-width:120px;justify-content:center" onclick="saveCredCard('stunnel', this)">Сохранить</button>
+                                <button type="button" class="btn btn-ghost" style="min-width:200px;justify-content:center" onclick="testCred('stunnel', this, 'bcStunnelTestResult')">Проверить SSH к stunnel</button>
+                                <span class="muted" id="bcStunnelTestResult" style="font-size:12px"></span>
+                            </div>
                         </div>
 
                         <div class="modal-error" id="bcError"></div>
-                        <div style="display:flex;gap:8px;margin-top:18px;align-items:center">
-                            <button type="submit" class="btn btn-primary" style="min-width:140px;justify-content:center">Сохранить</button>
-                            <button type="button" class="btn btn-ghost" style="min-width:170px;justify-content:center" onclick="testBalancerSsh(this)">Проверить SSH + nginx -t</button>
-                            <span class="muted" id="bcTestResult" style="font-size:12px"></span>
-                        </div>
-                    </form>`;
+                    </div>`;
             } catch (e) {
                 root.innerHTML = `<div class="muted" style="color:#fca5a5">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
             }
         }
         window.loadBalancerCreds = loadBalancerCreds;
 
-        async function saveBalancerCreds(e) {
-            e.preventDefault();
+        async function saveCredCard(kind, btn) {
             const errBox = document.getElementById('bcError');
             errBox.classList.remove('show');
-            const body = {
-                ssh_host:     document.getElementById('bcSshHost').value.trim(),
-                ssh_port:     parseInt(document.getElementById('bcSshPort').value, 10) || 22,
-                ssh_login:    document.getElementById('bcSshLogin').value.trim(),
-                ssh_password: document.getElementById('bcSshPassword').value,
-                ssh_sudo_pwd: document.getElementById('bcSshSudoPwd').value,
-                win_login:    document.getElementById('bcWinLogin').value.trim(),
-                win_password: document.getElementById('bcWinPassword').value,
-                stunnel_host:     document.getElementById('bcStunnelHost').value.trim(),
-                stunnel_port:     parseInt(document.getElementById('bcStunnelPort').value, 10) || 22,
-                stunnel_login:    document.getElementById('bcStunnelLogin').value.trim(),
-                stunnel_password: document.getElementById('bcStunnelPassword').value,
-                stunnel_sudo_pwd: document.getElementById('bcStunnelSudoPwd').value,
-            };
+            let body = {};
+            let title = '';
+            if (kind === 'ssh') {
+                title = 'SSH балансировщика';
+                body = {
+                    ssh_host:     document.getElementById('bcSshHost').value.trim(),
+                    ssh_port:     parseInt(document.getElementById('bcSshPort').value, 10) || 22,
+                    ssh_login:    document.getElementById('bcSshLogin').value.trim(),
+                    ssh_password: document.getElementById('bcSshPassword').value,
+                    ssh_sudo_pwd: document.getElementById('bcSshSudoPwd').value,
+                };
+            } else if (kind === 'ntlm') {
+                title = 'NTLM (Inceptum)';
+                body = {
+                    win_login:    document.getElementById('bcWinLogin').value.trim(),
+                    win_password: document.getElementById('bcWinPassword').value,
+                };
+            } else if (kind === 'stunnel') {
+                title = 'SSH к stunnel';
+                body = {
+                    stunnel_host:     document.getElementById('bcStunnelHost').value.trim(),
+                    stunnel_port:     parseInt(document.getElementById('bcStunnelPort').value, 10) || 22,
+                    stunnel_login:    document.getElementById('bcStunnelLogin').value.trim(),
+                    stunnel_password: document.getElementById('bcStunnelPassword').value,
+                    stunnel_sudo_pwd: document.getElementById('bcStunnelSudoPwd').value,
+                };
+            } else {
+                return;
+            }
+            const orig = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Сохраняю…'; }
             try {
                 const resp = await fetch('/api/balancer-credentials', {
                     method: 'POST',
@@ -4024,39 +4177,60 @@
                     const data = await resp.json().catch(() => ({}));
                     errBox.textContent = data.error || `Ошибка ${resp.status}`;
                     errBox.classList.add('show');
-                    return false;
+                    return;
                 }
-                toast('Учётки сохранены', 'ok');
-                loadBalancerCreds();
+                toast(`Сохранено: ${title}`, 'ok');
+                await loadBalancerCreds();
             } catch (err) {
                 errBox.textContent = `Сеть: ${err.message}`;
                 errBox.classList.add('show');
+            } finally {
+                // Перерисовываем форму, кнопку реcреирует loadBalancerCreds; если не перерисовалось — восстановим
+                if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = orig; }
             }
-            return false;
         }
-        window.saveBalancerCreds = saveBalancerCreds;
+        window.saveCredCard = saveCredCard;
 
         async function testBalancerSsh(btn) {
-            const out = document.getElementById('bcTestResult');
-            btn.disabled = true; out.textContent = 'Проверяю…'; out.style.color = '#9ca3af';
+            return testCred('balancer', btn, 'bcTestResult');
+        }
+        window.testBalancerSsh = testBalancerSsh;
+
+        async function testCred(kind, btn, outId) {
+            const urls = {
+                balancer: '/api/svc/test-balancer',
+                ntlm:     '/api/svc/test-ntlm',
+                stunnel:  '/api/svc/test-stunnel',
+            };
+            const url = urls[kind];
+            if (!url) return;
+            const out = document.getElementById(outId);
+            btn.disabled = true;
+            if (out) { out.textContent = 'Проверяю…'; out.style.color = '#9ca3af'; }
             try {
-                const resp = await fetch('/api/svc/test-balancer', {method: 'POST'});
+                const resp = await fetch(url, {method: 'POST'});
                 const data = await resp.json().catch(() => ({}));
-                if (resp.ok && data.ok) {
-                    out.textContent = `✓ ${data.output || 'ok'} (${data.host})`;
-                    out.style.color = '#6ee7b7';
-                } else {
-                    out.textContent = `✗ ${data.error || 'Ошибка ' + resp.status}`;
-                    out.style.color = '#fca5a5';
+                if (out) {
+                    if (resp.ok && data.ok) {
+                        const host = data.host ? ` (${data.host})` : '';
+                        const text = (data.output || 'ok').replace(/\n/g, ' · ');
+                        out.textContent = `✓ ${text}${host}`;
+                        out.style.color = '#6ee7b7';
+                    } else {
+                        out.textContent = `✗ ${data.error || 'Ошибка ' + resp.status}`;
+                        out.style.color = '#fca5a5';
+                    }
                 }
             } catch (e) {
-                out.textContent = `✗ ${e.message}`;
-                out.style.color = '#fca5a5';
+                if (out) {
+                    out.textContent = `✗ ${e.message}`;
+                    out.style.color = '#fca5a5';
+                }
             } finally {
                 btn.disabled = false;
             }
         }
-        window.testBalancerSsh = testBalancerSsh;
+        window.testCred = testCred;
 
         // ============ NODES CATALOG (admin) ============
         async function loadNodesCatalog() {

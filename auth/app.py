@@ -1487,12 +1487,21 @@ def ms_node_config(node_key):
 def _ms_session(host):
     if winrm is None:
         raise RuntimeError("pywinrm не установлен")
-    if not MS_WINRM_USER or not MS_WINRM_PASSWORD:
-        raise RuntimeError("MS_WINRM_USER / MS_WINRM_PASSWORD не заданы")
+    # Учётка берётся из «Учётки» → NTLM-блок (win_login/win_password).
+    # Если в Учётках пусто — пробуем legacy MS_WINRM_USER/MS_WINRM_PASSWORD из .env (для совместимости).
+    creds = None
+    try:
+        creds = get_balancer_creds()
+    except Exception:
+        creds = None
+    user = (creds.get("win_login")    if creds else "") or MS_WINRM_USER
+    pwd  = (creds.get("win_password") if creds else "") or MS_WINRM_PASSWORD
+    if not user or not pwd:
+        raise RuntimeError("NTLM-учётка не заполнена в «Учётках»")
     url = f"{MS_WINRM_SCHEME}://{host}:{MS_WINRM_PORT}/wsman"
     return winrm.Session(
         url,
-        auth=(MS_WINRM_USER, MS_WINRM_PASSWORD),
+        auth=(user, pwd),
         transport=MS_WINRM_TRANSPORT,
         read_timeout_sec=MS_WINRM_TIMEOUT + 5,
         operation_timeout_sec=MS_WINRM_TIMEOUT,
@@ -1755,6 +1764,77 @@ def svc_test_balancer():
         except Exception: pass
 
 
+@app.post("/api/svc/test-ntlm")
+def svc_test_ntlm():
+    """Тест NTLM-учётки: запрос /api/instances на первую ноду из реестра."""
+    _, err = require_route("balancer_creds")
+    if err: return err
+    creds = get_balancer_creds()
+    if not creds or not creds.get("win_login"):
+        return jsonify({"ok": False, "error": "NTLM-учётка не заполнена"}), 400
+    auth = _inceptum_auth(creds)
+    if auth is None:
+        return jsonify({"ok": False, "error": "NTLM-учётка пуста"}), 400
+    row = db().execute(
+        "SELECT node_key, host FROM ms_node_settings "
+        "ORDER BY group_key, position, node_key LIMIT 1"
+    ).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "В реестре нет ни одной ноды для теста"}), 400
+    host = row["host"] or _ms_default_host(row["node_key"])
+    if requests is None:
+        return jsonify({"ok": False, "error": "requests не установлен"}), 500
+    try:
+        r = requests.get(_inceptum_url(host), auth=auth,
+                         timeout=INCEPTUM_TIMEOUT,
+                         headers={"Accept": "application/json"})
+    except Exception as e:
+        return jsonify({"ok": False, "host": host, "error": f"сеть/таймаут: {e}"}), 502
+    if r.status_code != 200:
+        return jsonify({
+            "ok": False, "host": host,
+            "error": f"HTTP {r.status_code}: {(r.text or '')[:200]}",
+        }), 502
+    try:
+        instances = r.json()
+        count = len(instances) if isinstance(instances, list) else 0
+        return jsonify({
+            "ok": True, "host": host, "node": row["node_key"],
+            "output": f"получено {count} микросервисов",
+        })
+    except Exception:
+        return jsonify({"ok": True, "host": host, "output": "OK (ответ не JSON)"})
+
+
+@app.post("/api/svc/test-stunnel")
+def svc_test_stunnel():
+    """Тест SSH-учётки stunnel-сервера: подключаемся, выполняем whoami+hostname."""
+    _, err = require_route("balancer_creds")
+    if err: return err
+    creds = get_balancer_creds()
+    if not creds or not creds.get("stunnel_host"):
+        return jsonify({"ok": False, "error": "stunnel SSH-учётка не настроена"}), 400
+    try:
+        client = _stunnel_ssh_open(creds)
+    except BalancerError as e:
+        return jsonify({"ok": False, "error": str(e)}), 502
+    try:
+        rc, out, err_o = _ssh_run(client, "whoami && hostname")
+        if rc != 0:
+            return jsonify({"ok": False, "error": (err_o or out).strip() or f"exit={rc}"}), 502
+        # Также проверим, что systemctl видно (без sudo, просто is-active)
+        rc2, out2, _ = _ssh_run(client, f"systemctl is-active {STUNNEL_SERVICE_NAME} 2>/dev/null || true")
+        active_now = (out2 or "").strip() or "?"
+        return jsonify({
+            "ok": True,
+            "host": creds["stunnel_host"],
+            "output": f"{out.strip()}\nstunnel сейчас: {active_now}",
+        })
+    finally:
+        try: client.close()
+        except Exception: pass
+
+
 # ===== Stunnel: статус и управление =====
 STUNNEL_SERVICE_NAME = "stunnel"
 
@@ -1914,8 +1994,8 @@ def _ms_resolve_configs(node_keys):
 def _ms_short_error(err):
     """Сжимает технические ошибки WinRM/pywinrm в короткую читабельную метку."""
     e = (err or "").lower()
-    if "ms_winrm_user" in e or "pywinrm не установлен" in e:
-        return "WinRM-учётка не настроена в .env"
+    if "ntlm-учётка не заполнена" in e or "ms_winrm_user" in e or "pywinrm не установлен" in e:
+        return "NTLM-учётка не заполнена в «Учётках»"
     if "cannot find any service" in e or "objectnotfound" in e:
         return "Служба не найдена"
     if "unauthorized" in e or "401" in e or "authentication failed" in e or "access is denied" in e:
