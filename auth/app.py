@@ -1452,7 +1452,7 @@ MS_DEFAULT_SERVICE = "Inceptum.AppServer.3.0"
 
 # DNS names, IPv4, IPv6 — alphanumerics, dot, dash, underscore, colon for v6
 MS_HOST_RE     = re.compile(r"^[A-Za-z0-9._:\-]{1,253}$")
-MS_SERVICE_RE  = re.compile(r"^[A-Za-z0-9._\-]{1,64}$")
+MS_SERVICE_RE  = re.compile(r"^[A-Za-z0-9._\- ]{1,128}$")
 MS_NODE_KEY_RE = re.compile(r"^[A-Za-z0-9._\-]{1,64}$")
 MS_GROUP_RE    = re.compile(r"^[a-z0-9_\-]{1,32}$")
 
@@ -2285,7 +2285,7 @@ def ms_node_create():
     if not MS_HOST_RE.match(host):
         return jsonify({"error": "Хост: допустимы латиница, цифры, точка, дефис, подчёркивание (или IP)"}), 400
     if not MS_SERVICE_RE.match(service):
-        return jsonify({"error": "Имя службы: допустимы латиница, цифры, точка, дефис, подчёркивание (до 64 символов)"}), 400
+        return jsonify({"error": "Имя службы: допустимы латиница, цифры, пробел, точка, дефис, подчёркивание (до 128 символов)"}), 400
     conn = db()
     if conn.execute("SELECT 1 FROM ms_node_settings WHERE node_key = ?", (key,)).fetchone():
         return jsonify({"error": f"Хост с ключом «{key}» уже существует"}), 409
@@ -2333,7 +2333,7 @@ def ms_node_set(key):
     cur_svc_row = db().execute("SELECT service FROM ms_node_settings WHERE node_key = ?", (key,)).fetchone()
     service = (data.get("service") or "").strip() or (cur_svc_row["service"] if cur_svc_row and cur_svc_row["service"] else MS_DEFAULT_SERVICE)
     if not MS_SERVICE_RE.match(service):
-        return jsonify({"error": "Имя службы: допустимы латиница, цифры, точка, дефис, подчёркивание (до 64 символов)"}), 400
+        return jsonify({"error": "Имя службы: допустимы латиница, цифры, пробел, точка, дефис, подчёркивание (до 128 символов)"}), 400
     conn = db()
     if new_key != key:
         if conn.execute("SELECT 1 FROM ms_node_settings WHERE node_key = ?", (new_key,)).fetchone():
