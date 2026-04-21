@@ -986,21 +986,7 @@
         .stunnel-status.unknown  .dot { background: #6b7280; }
         .stunnel-status.unknown  .state { color: #9ca3af; }
 
-        .stunnel-actions { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-        .stunnel-output {
-            background: #0a0f1d;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            padding: 10px 12px;
-            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-            font-size: 11px;
-            color: #cbd5e1;
-            white-space: pre-wrap;
-            max-height: 320px;
-            overflow-y: auto;
-            line-height: 1.5;
-        }
-        .stunnel-output:empty { display: none; }
+        .stunnel-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
         /* === Блок учётных карточек === */
         .cred-card {
@@ -3968,7 +3954,6 @@
                         <button type="button" class="ms-action-btn stop"    onclick="stunnelAct('stop', this)">Выключить</button>
                         <button type="button" class="svc-tool-btn" onclick="loadStunnel()">⟳ Обновить</button>
                     </div>
-                    <div class="stunnel-output">${escapeHtml(d.status_output || '')}</div>
                 </div>`;
         }
 

@@ -1862,22 +1862,13 @@ def stunnel_status():
         return jsonify({"error": str(e)}), 502
     try:
         sudo_pwd = creds.get("stunnel_sudo_pwd") or ""
-        # is-active возвращает 0 если active; иначе ненулевой код
         rc1, out_active, err_active = _stunnel_run(
             client, sudo_pwd, f"systemctl is-active {STUNNEL_SERVICE_NAME}"
         )
         is_active = (out_active or err_active or "").strip() or "unknown"
-        # Полный status (его выход — обычно non-zero, не ошибка)
-        rc2, out_status, err_status = _stunnel_run(
-            client, sudo_pwd,
-            f"systemctl status {STUNNEL_SERVICE_NAME} --no-pager -l",
-            timeout=15,
-        )
-        status_text = (out_status + ("\n" + err_status if err_status else "")).strip()
         return jsonify({
             "host": creds["stunnel_host"],
             "is_active": is_active,
-            "status_output": status_text,
         })
     finally:
         try: client.close()
