@@ -1892,8 +1892,12 @@
                            oninput="this.value = this.value.replace(/[^A-Za-z0-9.:_-]/g, '')">
                     <div class="field-hint" id="msNodeHostHint"></div>
                 </div>
-                <input type="hidden" id="msNodeService" value="">
-                <div class="field-hint" id="msNodeServiceHint" style="display:none"></div>
+                <div class="field">
+                    <label for="msNodeService">Имя Windows-службы Inceptum</label>
+                    <input type="text" id="msNodeService" autocomplete="off" spellcheck="false"
+                           placeholder="Inceptum.AppServer.3.0" maxlength="128">
+                    <div class="field-hint" id="msNodeServiceHint">имя службы, статус которой опрашивается на этом хосте</div>
+                </div>
                 <div class="field">
                     <label>Роль</label>
                     <div class="role-picker" id="msNodeRolePicker">
@@ -2825,9 +2829,10 @@
             e.preventDefault();
             const errBox = document.getElementById('msNodeError');
             errBox.classList.remove('show');
-            const key  = document.getElementById('msNodeKeyInput').value.trim();
-            const host = document.getElementById('msNodeHost').value.trim();
-            const role = (document.getElementById('msNodeRole')?.value || '').trim();
+            const key     = document.getElementById('msNodeKeyInput').value.trim();
+            const host    = document.getElementById('msNodeHost').value.trim();
+            const service = document.getElementById('msNodeService').value.trim();
+            const role    = (document.getElementById('msNodeRole')?.value || '').trim();
             if (!key || !host || !role) {
                 errBox.textContent = 'Заполните все поля: ключ, хост, роль';
                 errBox.classList.add('show');
@@ -2839,13 +2844,13 @@
                     resp = await fetch('/api/ms/nodes', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({key, group: _msAddingGroup, host, role}),
+                        body: JSON.stringify({key, group: _msAddingGroup, host, service, role}),
                     });
                 } else if (_msEditingNode) {
                     resp = await fetch(`/api/ms/nodes/${encodeURIComponent(_msEditingNode)}`, {
                         method: 'PATCH',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({key, host, role}),
+                        body: JSON.stringify({key, host, service, role}),
                     });
                 } else {
                     return false;

@@ -2330,7 +2330,6 @@ def ms_node_set(key):
         return jsonify({"error": "Хост: допустимы латиница, цифры, точка, дефис, подчёркивание (или IP)"}), 400
     if role not in ("master", "slave"):
         return jsonify({"error": "Роль: master или slave"}), 400
-    # service нынче не в форме — берём существующее значение или дефолт
     cur_svc_row = db().execute("SELECT service FROM ms_node_settings WHERE node_key = ?", (key,)).fetchone()
     service = (data.get("service") or "").strip() or (cur_svc_row["service"] if cur_svc_row and cur_svc_row["service"] else MS_DEFAULT_SERVICE)
     if not MS_SERVICE_RE.match(service):
