@@ -60,11 +60,11 @@ ROUTES = [
     {"key": "services",      "title": "Службы",            "group": "main"},
     {"key": "microservices", "title": "Микросервисы",      "group": "main"},
     {"key": "users",            "title": "Пользователи",         "group": "settings", "admin_only": True},
-    {"key": "db_connection",    "title": "Подключение к БД",     "group": "settings", "admin_only": True},
-    {"key": "ms_catalog",       "title": "Каталог микросервисов","group": "settings", "admin_only": True},
-    {"key": "nodes_catalog",    "title": "Каталог нод для микросервисов", "group": "settings", "admin_only": True},
-    {"key": "balancer_creds",   "title": "Учётки для балансировки", "group": "settings", "admin_only": True},
-    {"key": "about",            "title": "О программе",          "group": "settings", "always": True},
+    {"key": "db_connection",    "title": "Подключение к БД",     "group": "settings"},
+    {"key": "ms_catalog",       "title": "Каталог микросервисов","group": "settings"},
+    {"key": "nodes_catalog",    "title": "Каталог нод для микросервисов", "group": "settings"},
+    {"key": "balancer_creds",   "title": "Учётки для балансировки", "group": "settings"},
+    {"key": "about",            "title": "О программе",          "group": "settings"},
 ]
 ROUTE_KEYS = {r["key"] for r in ROUTES}
 ALWAYS_ALLOWED = {r["key"] for r in ROUTES if r.get("always")}
@@ -1311,7 +1311,7 @@ def op_lookup():
 # ===== DB connection settings (admin) =====
 @app.get("/api/db/settings")
 def api_db_settings_get():
-    _, err = require_admin()
+    _, err = require_route("db_connection")
     if err: return err
     out = []
     for spec in DB_CONNECTIONS_SPEC:
@@ -1333,7 +1333,7 @@ def api_db_settings_get():
 
 @app.post("/api/db/settings")
 def api_db_settings_post():
-    _, err = require_admin()
+    _, err = require_route("db_connection")
     if err: return err
     body = request.get_json(silent=True) or {}
     name = (body.get("name") or "").strip()
@@ -1359,7 +1359,7 @@ def api_db_settings_post():
 
 @app.post("/api/db/test")
 def api_db_test():
-    _, err = require_admin()
+    _, err = require_route("db_connection")
     if err: return err
     body = request.get_json(silent=True) or {}
     name = (body.get("name") or "cpl").strip()
@@ -1687,7 +1687,7 @@ def _balancer_apply(client, sudo_pwd, path, host_keys, direction):
 # ===== Тестовый эндпойнт: проверка SSH-учётки + nginx -t =====
 @app.post("/api/svc/test-balancer")
 def svc_test_balancer():
-    _, err = require_admin()
+    _, err = require_route("balancer_creds")
     if err: return err
     creds = get_balancer_creds()
     if not creds or not creds.get("ssh_host"):
@@ -2196,7 +2196,7 @@ def ms_catalog_list():
 
 @app.post("/api/catalog/microservices")
 def ms_catalog_create():
-    _, err = require_admin()
+    _, err = require_route("ms_catalog")
     if err: return err
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
@@ -2236,7 +2236,7 @@ def ms_catalog_create():
 
 @app.patch("/api/catalog/microservices/<int:cid>")
 def ms_catalog_update(cid):
-    _, err = require_admin()
+    _, err = require_route("ms_catalog")
     if err: return err
     data = request.get_json(silent=True) or {}
     conn = db()
@@ -2283,7 +2283,7 @@ def ms_catalog_update(cid):
 
 @app.delete("/api/catalog/microservices/<int:cid>")
 def ms_catalog_delete(cid):
-    _, err = require_admin()
+    _, err = require_route("ms_catalog")
     if err: return err
     conn = db()
     res = conn.execute("DELETE FROM ms_catalog WHERE id = ?", (cid,))
@@ -2297,7 +2297,7 @@ def ms_catalog_delete(cid):
 # ===== Учётки для балансировки =====
 @app.get("/api/balancer-credentials")
 def balancer_creds_get():
-    _, err = require_admin()
+    _, err = require_route("balancer_creds")
     if err: return err
     row = db().execute("SELECT * FROM balancer_credentials WHERE id = 1").fetchone()
     if not row:
@@ -2317,7 +2317,7 @@ def balancer_creds_get():
 
 @app.post("/api/balancer-credentials")
 def balancer_creds_set():
-    u, err = require_admin()
+    u, err = require_route("balancer_creds")
     if err: return err
     data = request.get_json(silent=True) or {}
     conn = db()
@@ -2389,7 +2389,7 @@ def ms_groups_list():
 
 @app.post("/api/ms/groups")
 def ms_groups_create():
-    _, err = require_admin()
+    _, err = require_route("nodes_catalog")
     if err: return err
     data = request.get_json(silent=True) or {}
     key   = (data.get("key")   or "").strip().lower()
@@ -2417,7 +2417,7 @@ def ms_groups_create():
 
 @app.delete("/api/ms/groups/<key>")
 def ms_groups_delete(key):
-    _, err = require_admin()
+    _, err = require_route("nodes_catalog")
     if err: return err
     if not MS_GROUP_RE.match(key):
         return jsonify({"error": "Недопустимый ключ"}), 400

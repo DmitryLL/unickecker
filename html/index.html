@@ -2013,10 +2013,10 @@
 
             if (route === 'users' && state.me.role === 'admin') loadUsers();
             if (route === 'operations') resetOpResult();
-            if (route === 'db_connection' && state.me.role === 'admin') loadDbSettings();
-            if (route === 'ms_catalog' && state.me.role === 'admin') loadMsCatalog();
-            if (route === 'nodes_catalog' && state.me.role === 'admin') loadNodesCatalog();
-            if (route === 'balancer_creds' && state.me.role === 'admin') loadBalancerCreds();
+            if (route === 'db_connection') loadDbSettings();
+            if (route === 'ms_catalog') loadMsCatalog();
+            if (route === 'nodes_catalog') loadNodesCatalog();
+            if (route === 'balancer_creds') loadBalancerCreds();
             if (route === 'services') initMicroservices();
             else {
                 if (msPollTimer)   { clearInterval(msPollTimer);  msPollTimer = null; }
