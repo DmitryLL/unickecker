@@ -2481,7 +2481,7 @@
                 ? document.getElementById('msConsoleErrors')
                 : document.getElementById('msConsole');
             if (!box) return;
-            const nearTop = box.scrollTop < 40;
+            const nearBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 40;
             const ts = new Date(entry.ts * 1000).toLocaleTimeString('ru-RU', { hour12: false });
             const line = document.createElement('div');
             line.className = `ms-console-line ${lvl || ''}`;
@@ -2490,8 +2490,8 @@
                 : '';
             line.innerHTML = `<span class="ts">${ts}</span>${userTag}<span class="msg"></span>`;
             line.querySelector('.msg').textContent = entry.message || '';
-            box.insertBefore(line, box.firstChild);
-            if (nearTop) box.scrollTop = 0;
+            box.appendChild(line);
+            if (nearBottom) box.scrollTop = box.scrollHeight;
         }
 
         async function msConsoleLoad() {
@@ -3311,15 +3311,15 @@
 
         function _appendSvcLogLine(target, e) {
             if (!target) return;
-            const nearTop = target.scrollTop < 40;
+            const nearBottom = (target.scrollHeight - target.scrollTop - target.clientHeight) < 40;
             const ts = new Date(e.ts * 1000).toLocaleTimeString('ru-RU', {hour12: false});
             const line = document.createElement('div');
             line.className = `ms-console-line ${e.level || 'info'}`;
             const u = e.username ? `<span class="user">[${escapeHtml(e.username)}]</span>` : '';
             line.innerHTML = `<span class="ts">${ts}</span>${u}<span class="msg"></span>`;
             line.querySelector('.msg').textContent = e.message || '';
-            target.insertBefore(line, target.firstChild);
-            if (nearTop) target.scrollTop = 0;
+            target.appendChild(line);
+            if (nearBottom) target.scrollTop = target.scrollHeight;
         }
 
         async function fetchSvcServerLog() {
