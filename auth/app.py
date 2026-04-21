@@ -59,11 +59,12 @@ ROUTES = [
     {"key": "operations",    "title": "Статусы операций",  "group": "main"},
     {"key": "services",      "title": "Службы",            "group": "main"},
     {"key": "microservices", "title": "Микросервисы",      "group": "main"},
+    {"key": "stunnel",       "title": "Stunnel",           "group": "main"},
     {"key": "users",            "title": "Пользователи",         "group": "settings", "admin_only": True},
     {"key": "db_connection",    "title": "Подключение к БД",     "group": "settings"},
     {"key": "ms_catalog",       "title": "Каталог микросервисов","group": "settings"},
     {"key": "nodes_catalog",    "title": "Каталог нод для микросервисов", "group": "settings"},
-    {"key": "balancer_creds",   "title": "Учётки для балансировки", "group": "settings"},
+    {"key": "balancer_creds",   "title": "Учётки",                 "group": "settings"},
     {"key": "about",            "title": "О программе",          "group": "settings"},
 ]
 ROUTE_KEYS = {r["key"] for r in ROUTES}
@@ -331,6 +332,17 @@ def init_db():
             updated_by   TEXT
         )
     """)
+    # Миграция: добавляем поля для stunnel-сервера
+    _bc_cols = {r[1] for r in conn.execute("PRAGMA table_info(balancer_credentials)").fetchall()}
+    for _c, _ddl in [
+        ("stunnel_host",     "TEXT NOT NULL DEFAULT ''"),
+        ("stunnel_port",     "INTEGER NOT NULL DEFAULT 22"),
+        ("stunnel_login",    "TEXT NOT NULL DEFAULT ''"),
+        ("stunnel_password", "TEXT NOT NULL DEFAULT ''"),
+        ("stunnel_sudo_pwd", "TEXT NOT NULL DEFAULT ''"),
+    ]:
+        if _c not in _bc_cols:
+            conn.execute(f"ALTER TABLE balancer_credentials ADD COLUMN {_c} {_ddl}")
     conn.execute(
         "INSERT OR IGNORE INTO balancer_credentials (id, updated_at) VALUES (1, ?)",
         (_now,),
@@ -1546,42 +1558,79 @@ def _strip_node_prefix(node_key):
     return nk
 
 
-def _ssh_open(creds):
+def _ssh_connect(host, port, login, password):
+    """Generic SSH-коннект с обработкой ошибок."""
     if paramiko is None:
         raise BalancerError("paramiko не установлен")
-    if not creds or not creds.get("ssh_host") or not creds.get("ssh_login"):
-        raise BalancerError("SSH-учётка балансировщика не настроена")
+    if not host or not login:
+        raise BalancerError("Хост или логин SSH не заданы")
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
         client.connect(
-            hostname=creds["ssh_host"],
-            port=int(creds.get("ssh_port") or 22),
-            username=creds["ssh_login"],
-            password=creds.get("ssh_password") or None,
+            hostname=host,
+            port=int(port or 22),
+            username=login,
+            password=password or None,
             timeout=SSH_TIMEOUT_CONNECT,
             allow_agent=False,
             look_for_keys=False,
         )
     except Exception as e:
-        raise BalancerError(f"SSH connect: {e}")
+        raise BalancerError(f"SSH connect {host}: {e}")
     return client
 
 
+def _ssh_open(creds):
+    """SSH к балансировщику nginx (использует ssh_* поля)."""
+    if not creds or not creds.get("ssh_host") or not creds.get("ssh_login"):
+        raise BalancerError("SSH-учётка балансировщика не настроена")
+    return _ssh_connect(creds["ssh_host"], creds.get("ssh_port"),
+                        creds["ssh_login"], creds.get("ssh_password"))
+
+
+def _stunnel_ssh_open(creds):
+    """SSH к stunnel-серверу (использует stunnel_* поля)."""
+    if not creds or not creds.get("stunnel_host") or not creds.get("stunnel_login"):
+        raise BalancerError("SSH-учётка stunnel не настроена")
+    return _ssh_connect(creds["stunnel_host"], creds.get("stunnel_port"),
+                        creds["stunnel_login"], creds.get("stunnel_password"))
+
+
+def _filter_shell_noise(text):
+    """Убирает обычный мусор из stderr/stdout SSH:
+    tput-предупреждения о $TERM, прочие баннеры от /etc/profile.d.
+    """
+    if not text:
+        return text
+    out = []
+    for line in text.split("\n"):
+        ls = line.strip()
+        if not ls:
+            continue
+        if ls.startswith("tput:"):
+            continue
+        if ls.startswith("[sudo] password"):
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
 def _ssh_run(client, cmd, timeout=SSH_TIMEOUT_CMD):
-    """Возвращает (rc, stdout, stderr). Не выполняет sudo сам."""
-    stdin, stdout, stderr = client.exec_command(cmd, timeout=timeout)
+    """Возвращает (rc, stdout, stderr). Не выполняет sudo сам.
+    TERM=dumb подавляет tput-warning'и от шеловских профилей."""
+    full = f"TERM=dumb {cmd}"
+    stdin, stdout, stderr = client.exec_command(full, timeout=timeout)
     out = stdout.read().decode("utf-8", "replace")
     err = stderr.read().decode("utf-8", "replace")
     rc = stdout.channel.recv_exit_status()
-    return rc, out, err
+    return rc, _filter_shell_noise(out), _filter_shell_noise(err)
 
 
 def _ssh_run_sudo(client, sudo_pwd, cmd, timeout=SSH_TIMEOUT_CMD):
     """Запуск с sudo. Если sudo_pwd пустой — пробуем sudo -n (NOPASSWD)."""
     if sudo_pwd:
-        # Пароль на stdin через sudo -S; -p '' гасит prompt в stderr.
-        full = f"sudo -S -p '' {cmd}"
+        full = f"TERM=dumb sudo -S -p '' {cmd}"
         stdin, stdout, stderr = client.exec_command(full, timeout=timeout)
         try:
             stdin.write(sudo_pwd + "\n")
@@ -1595,7 +1644,7 @@ def _ssh_run_sudo(client, sudo_pwd, cmd, timeout=SSH_TIMEOUT_CMD):
         out = stdout.read().decode("utf-8", "replace")
         err = stderr.read().decode("utf-8", "replace")
         rc = stdout.channel.recv_exit_status()
-        return rc, out, err
+        return rc, _filter_shell_noise(out), _filter_shell_noise(err)
     else:
         return _ssh_run(client, f"sudo -n {cmd}", timeout=timeout)
 
@@ -1701,6 +1750,87 @@ def svc_test_balancer():
         return jsonify({"ok": True, "output": out, "host": creds["ssh_host"]})
     except BalancerError as e:
         return jsonify({"ok": False, "error": str(e)}), 502
+    finally:
+        try: client.close()
+        except Exception: pass
+
+
+# ===== Stunnel: статус и управление =====
+STUNNEL_SERVICE_NAME = "stunnel"
+
+def _stunnel_run(client, sudo_pwd, cmd, timeout=SSH_TIMEOUT_CMD):
+    return _ssh_run_sudo(client, sudo_pwd, cmd, timeout=timeout)
+
+
+@app.get("/api/stunnel/status")
+def stunnel_status():
+    _, err = require_route("stunnel")
+    if err: return err
+    creds = get_balancer_creds()
+    if not creds or not creds.get("stunnel_host"):
+        return jsonify({"error": "stunnel-сервер не настроен в учётках"}), 400
+    try:
+        client = _stunnel_ssh_open(creds)
+    except BalancerError as e:
+        return jsonify({"error": str(e)}), 502
+    try:
+        sudo_pwd = creds.get("stunnel_sudo_pwd") or ""
+        # is-active возвращает 0 если active; иначе ненулевой код
+        rc1, out_active, err_active = _stunnel_run(
+            client, sudo_pwd, f"systemctl is-active {STUNNEL_SERVICE_NAME}"
+        )
+        is_active = (out_active or err_active or "").strip() or "unknown"
+        # Полный status (его выход — обычно non-zero, не ошибка)
+        rc2, out_status, err_status = _stunnel_run(
+            client, sudo_pwd,
+            f"systemctl status {STUNNEL_SERVICE_NAME} --no-pager -l",
+            timeout=15,
+        )
+        status_text = (out_status + ("\n" + err_status if err_status else "")).strip()
+        return jsonify({
+            "host": creds["stunnel_host"],
+            "is_active": is_active,
+            "status_output": status_text,
+        })
+    finally:
+        try: client.close()
+        except Exception: pass
+
+
+@app.post("/api/stunnel/<action>")
+def stunnel_action(action):
+    if action not in ("start", "stop", "restart"):
+        return jsonify({"error": "Неизвестное действие"}), 400
+    u, err = require_route("stunnel")
+    if err: return err
+    creds = get_balancer_creds()
+    if not creds or not creds.get("stunnel_host"):
+        return jsonify({"error": "stunnel-сервер не настроен в учётках"}), 400
+    try:
+        client = _stunnel_ssh_open(creds)
+    except BalancerError as e:
+        return jsonify({"error": str(e)}), 502
+    try:
+        sudo_pwd = creds.get("stunnel_sudo_pwd") or ""
+        rc, out, err_o = _stunnel_run(
+            client, sudo_pwd,
+            f"systemctl {action} {STUNNEL_SERVICE_NAME}",
+            timeout=20,
+        )
+        if rc != 0:
+            return jsonify({
+                "ok": False,
+                "error": (err_o or out).strip() or f"exit={rc}",
+            }), 502
+        # Возвращаем актуальный статус
+        _, out_active, err_active = _stunnel_run(
+            client, sudo_pwd, f"systemctl is-active {STUNNEL_SERVICE_NAME}"
+        )
+        return jsonify({
+            "ok": True,
+            "is_active": (out_active or err_active or "").strip() or "unknown",
+            "output": (out + ("\n" + err_o if err_o else "")).strip(),
+        })
     finally:
         try: client.close()
         except Exception: pass
@@ -2310,6 +2440,11 @@ def balancer_creds_get():
         "ssh_sudo_pwd_set": bool(row["ssh_sudo_pwd"]),
         "win_login":   row["win_login"]  or "",
         "win_password_set": bool(row["win_password"]),
+        "stunnel_host":    row["stunnel_host"]   or "",
+        "stunnel_port":    row["stunnel_port"]   or 22,
+        "stunnel_login":   row["stunnel_login"]  or "",
+        "stunnel_password_set": bool(row["stunnel_password"]),
+        "stunnel_sudo_pwd_set": bool(row["stunnel_sudo_pwd"]),
         "updated_at":  row["updated_at"] or 0,
         "updated_by":  row["updated_by"] or "",
     })
@@ -2336,9 +2471,18 @@ def balancer_creds_set():
         upd("ssh_port", p)
     if "ssh_login" in data:   upd("ssh_login", (data["ssh_login"] or "").strip())
     if "win_login" in data:   upd("win_login", (data["win_login"] or "").strip())
+    if "stunnel_host" in data:  upd("stunnel_host",  (data["stunnel_host"] or "").strip())
+    if "stunnel_login" in data: upd("stunnel_login", (data["stunnel_login"] or "").strip())
+    if "stunnel_port" in data:
+        try:
+            sp = int(data["stunnel_port"]); assert 1 <= sp <= 65535
+        except Exception:
+            return jsonify({"error": "stunnel_port должен быть числом 1..65535"}), 400
+        upd("stunnel_port", sp)
     # Пароли: если поле прислано пустой строкой — оставляем как есть (не затираем).
     # Если непустое — шифруем и пишем.
-    for fld in ("ssh_password", "ssh_sudo_pwd", "win_password"):
+    for fld in ("ssh_password", "ssh_sudo_pwd", "win_password",
+                "stunnel_password", "stunnel_sudo_pwd"):
         if fld in data and (data[fld] or "") != "":
             upd(fld, encrypt_secret(data[fld]))
     if not fields:
@@ -2365,6 +2509,11 @@ def get_balancer_creds():
         "ssh_sudo_pwd": decrypt_secret(row["ssh_sudo_pwd"]),
         "win_login":    row["win_login"]  or "",
         "win_password": decrypt_secret(row["win_password"]),
+        "stunnel_host":     row["stunnel_host"]   or "",
+        "stunnel_port":     row["stunnel_port"]   or 22,
+        "stunnel_login":    row["stunnel_login"]  or "",
+        "stunnel_password": decrypt_secret(row["stunnel_password"]),
+        "stunnel_sudo_pwd": decrypt_secret(row["stunnel_sudo_pwd"]),
     }
 
 
