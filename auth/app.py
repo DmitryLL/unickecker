@@ -1484,11 +1484,9 @@ def ms_node_config(node_key):
     return host, service
 
 
-def _ms_session(host):
-    if winrm is None:
-        raise RuntimeError("pywinrm не установлен")
-    # Учётка берётся из «Учётки» → NTLM-блок (win_login/win_password).
-    # Если в Учётках пусто — пробуем legacy MS_WINRM_USER/MS_WINRM_PASSWORD из .env (для совместимости).
+def _ms_resolve_winrm_creds():
+    """Берём NTLM-учётку из «Учёток» (UI) → fallback на env. Должно вызываться
+    в Flask-контексте (request handler), не из worker-потоков."""
     creds = None
     try:
         creds = get_balancer_creds()
@@ -1496,6 +1494,15 @@ def _ms_session(host):
         creds = None
     user = (creds.get("win_login")    if creds else "") or MS_WINRM_USER
     pwd  = (creds.get("win_password") if creds else "") or MS_WINRM_PASSWORD
+    return user, pwd
+
+
+def _ms_session(host, user=None, pwd=None):
+    if winrm is None:
+        raise RuntimeError("pywinrm не установлен")
+    # Если user/pwd не переданы (legacy-вызов) — попробуем разрешить из контекста.
+    if user is None or pwd is None:
+        user, pwd = _ms_resolve_winrm_creds()
     if not user or not pwd:
         raise RuntimeError("NTLM-учётка не заполнена в «Учётках»")
     url = f"{MS_WINRM_SCHEME}://{host}:{MS_WINRM_PORT}/wsman"
@@ -1916,9 +1923,9 @@ def stunnel_action(action):
         except Exception: pass
 
 
-def _ms_query_status(host, service):
+def _ms_query_status(host, service, user=None, pwd=None):
     try:
-        sess = _ms_session(host)
+        sess = _ms_session(host, user, pwd)
         ps = f"(Get-Service -Name '{service}' -ErrorAction Stop).Status"
         r = sess.run_ps(ps)
         if r.status_code != 0:
@@ -1933,10 +1940,10 @@ def _ms_query_status(host, service):
         return "unreachable"
 
 
-def _ms_query_status_and_version(host, service):
+def _ms_query_status_and_version(host, service, user=None, pwd=None):
     """Возвращает (state, version_str) — обоими одним WinRM-запросом."""
     try:
-        sess = _ms_session(host)
+        sess = _ms_session(host, user, pwd)
         ps = (
             f"$n='{service}'; "
             "$svc = Get-CimInstance Win32_Service -Filter \"Name='$n'\" -ErrorAction SilentlyContinue; "
@@ -1967,7 +1974,7 @@ def _ms_query_status_and_version(host, service):
         return ("unreachable", "")
 
 
-def _ms_run_action(host, service, action):
+def _ms_run_action(host, service, action, user=None, pwd=None):
     cmd_map = {
         "start":   f"Start-Service -Name '{service}' -ErrorAction Stop",
         "stop":    f"Stop-Service  -Name '{service}' -Force -ErrorAction Stop",
@@ -1976,7 +1983,7 @@ def _ms_run_action(host, service, action):
     if action not in cmd_map:
         return {"ok": False, "error": "Неизвестное действие"}
     try:
-        sess = _ms_session(host)
+        sess = _ms_session(host, user, pwd)
         r = sess.run_ps(cmd_map[action])
         if r.status_code == 0:
             return {"ok": True, "message": f"{action} ok"}
@@ -2152,9 +2159,11 @@ def ms_status():
     configs = _ms_resolve_configs(nodes)
     statuses = {n: "not_found" for n in nodes if n not in configs}
     valid = list(configs.keys())
+    # резолвим NTLM-учётку в request-контексте, чтобы worker-потоки её не дёргали
+    user, pwd = _ms_resolve_winrm_creds()
     def query(n):
         host, service = configs[n]
-        return _ms_query_status(host, service)
+        return _ms_query_status(host, service, user, pwd)
     if valid:
         with ThreadPoolExecutor(max_workers=min(16, len(valid))) as ex:
             for n, st in zip(valid, ex.map(query, valid)):
@@ -2184,9 +2193,10 @@ def ms_action():
     targeted = list(configs.keys())
     ms_console_append("info", f"{label} {svc_label} — {len(targeted)} {'хост' if len(targeted) == 1 else 'хостов'}", username)
     results = {}
+    user, pwd = _ms_resolve_winrm_creds()
     def run(n):
         host, service = configs[n]
-        return _ms_run_action(host, service, action)
+        return _ms_run_action(host, service, action, user, pwd)
     ok_nodes = []
     err_groups = {}
     with ThreadPoolExecutor(max_workers=min(8, len(targeted))) as ex:
