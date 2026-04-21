@@ -751,7 +751,7 @@ def parse_operation(row):
         total_fee = params.get("AcceptedTotalFee")
 
     sender_rows = [
-        ["Статус",                  result["status_label"]],
+        ["Статус в CP",             result["status_label"]],
         ["Статус в ПОЮ",            get_usdb_status_text(result["knp"])],
         ["Тип операции",            op_type],
     ]
@@ -1021,7 +1021,7 @@ def op_lookup():
             "supported": False,
             "message": cpl_message,
             "sender_rows": [
-                ["Статус",       "—"],
+                ["Статус в CP",  "—"],
                 ["Статус в ПОЮ", usdb_text],
             ],
             "rows": [
