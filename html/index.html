@@ -350,6 +350,19 @@
         }
 
         /* ============ OPERATION CARD ============ */
+        .op-wrap {
+            display: flex; gap: 16px; align-items: flex-start;
+            max-width: 100%;
+        }
+        .op-wrap-split .op-card { flex: 1 1 600px; max-width: 720px; }
+        .op-wrap-split .op-aside { flex: 1 1 380px; min-width: 320px; max-width: 540px; }
+        .op-aside > * { margin-top: 0 !important; }
+        .op-aside > * + * { margin-top: 10px; }
+        @media (max-width: 1100px) {
+            .op-wrap { flex-direction: column; }
+            .op-wrap-split .op-card,
+            .op-wrap-split .op-aside { flex: 1 1 auto; max-width: 720px; min-width: 0; }
+        }
         .op-card {
             background: rgba(17, 24, 39, 0.6);
             border: 1px solid rgba(255, 255, 255, 0.06);
@@ -848,18 +861,22 @@
                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                        <span>Копировать</span>
                    </button>` : '';
+            const hasAside = !!(note || info);
             return `
-                <div class="op-card">
-                    ${senderBlock}
-                    <div class="op-card-head">
-                        <div class="op-head-left">
-                            <span class="status-chip ${chipCls}">${escapeHtml(r.status_label || '—')}</span>
+                <div class="op-wrap${hasAside ? ' op-wrap-split' : ''}">
+                    <div class="op-card">
+                        ${senderBlock}
+                        <div class="op-card-head">
+                            <div class="op-head-left">
+                                <span class="status-chip ${chipCls}">${escapeHtml(r.status_label || '—')}</span>
+                            </div>
+                            <div class="op-head-right">
+                                ${copyBtn}
+                            </div>
                         </div>
-                        <div class="op-head-right">
-                            ${copyBtn}
-                        </div>
+                        ${body}
                     </div>
-                    ${body}${note}${info}
+                    ${hasAside ? `<aside class="op-aside">${note}${info}</aside>` : ''}
                 </div>`;
         }
 
