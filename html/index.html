@@ -1142,6 +1142,9 @@
             border-radius: 12px;
             overflow: hidden;
             min-height: 360px;
+            /* без max-height бокс тянется по мере роста лога и утягивает соседей;
+               ограничиваем высоту, внутренний .ms-console скроллит сам. */
+            max-height: calc(100vh - 220px);
         }
         .svc-console-half {
             display: flex; flex-direction: column;
@@ -4013,7 +4016,13 @@
             if (nearBottom) target.scrollTop = target.scrollHeight;
         }
 
+        let _svcLogInFlight = false;
         async function fetchSvcServerLog() {
+            // Защита от наложения параллельных поллов: если предыдущий запрос ещё
+            // в пути — пропускаем. Иначе несколько запросов читают одинаковое
+            // since_action и каждый дописывает те же события → дубликаты в логе.
+            if (_svcLogInFlight) return;
+            _svcLogInFlight = true;
             try {
                 const url = `/api/svc/console?since_action=${_svcLogLastIds.action}&since_error=${_svcLogLastIds.error}&limit=500`;
                 const resp = await fetch(url);
@@ -4030,6 +4039,9 @@
                     if (e.id > _svcLogLastIds.error) _svcLogLastIds.error = e.id;
                 }
             } catch {}
+            finally {
+                _svcLogInFlight = false;
+            }
         }
 
         async function fetchSvcRunState() {
