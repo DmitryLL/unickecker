@@ -149,6 +149,37 @@
         }
         .placeholder svg { width: 40px; height: 40px; margin-bottom: 14px; color: #4b5563; stroke-width: 1.5; }
         .placeholder-title { font-size: 16px; font-weight: 600; color: #9ca3af; margin-bottom: 4px; }
+
+        .about-view {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #d1d5db;
+            background: rgba(17, 24, 39, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 20px 24px;
+            max-width: 920px;
+            min-height: 120px;
+        }
+        .about-view.empty { color: #6b7280; font-style: italic; }
+        .about-editor {
+            width: 100%;
+            max-width: 920px;
+            min-height: 420px;
+            resize: vertical;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #e5e7eb;
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px 18px;
+            outline: none;
+        }
+        .about-editor:focus { border-color: rgba(99, 102, 241, 0.5); }
         .placeholder-text { font-size: 13px; line-height: 1.5; }
 
         /* ============ BUTTONS ============ */
@@ -1832,11 +1863,18 @@
 
             <!-- ABOUT -->
             <section data-route="about">
-                <div class="page-header"><div><h1 class="page-title">О программе</h1><div class="page-sub">Информация о системе</div></div></div>
-                <div class="placeholder">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                    <div class="placeholder-title">В разработке</div>
-                    <div class="placeholder-text">Раздел появится позже.</div>
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">О программе</h1>
+                        <div class="page-sub">Документация и справочная информация</div>
+                        <div id="aboutHeaderActions" style="display:flex;gap:8px;margin-top:12px"></div>
+                    </div>
+                </div>
+                <div id="aboutMeta" class="muted" style="font-size:12px;margin-bottom:12px"></div>
+                <div id="aboutView" class="about-view muted">Загрузка…</div>
+                <div id="aboutEditorWrap" style="display:none">
+                    <textarea id="aboutEditor" class="about-editor" spellcheck="false"></textarea>
+                    <div id="aboutEditError" class="modal-error" style="margin-top:10px"></div>
                 </div>
             </section>
 
@@ -2314,6 +2352,7 @@
             if (route === 'nodes_catalog') loadNodesCatalog();
             if (route === 'balancer_creds') loadBalancerCreds();
             if (route === 'stunnel') { loadStunnel(); startStunnelPolling(); } else stopStunnelPolling();
+            if (route === 'about') loadAbout(); else cancelAboutEdit({ silent: true });
             if (route === 'services') initMicroservices();
             else {
                 if (msPollTimer)   { clearInterval(msPollTimer);  msPollTimer = null; }
@@ -3424,8 +3463,9 @@
         window.setBalMode = setBalMode;
 
         // ============ РЕЖИМ «НОДЫ» ============
-        const _nodesCheckSel = new Set();               // node_key
+        const _nodesCheckSel = new Set();               // node_key — для bulk-действий
         const _nodesRotation = {};                      // node_key → { svc: true|false|null }
+        let   _nodesFocus    = null;                    // node_key — сейчас просматриваемая нода (карточка справа)
 
         function _allNodes() {
             // [{plecho, hosts:[{name, svcs:[...]}]}]
@@ -3459,13 +3499,14 @@
                                    : '';
                     const rowCls = ['svc-list-row'];
                     if (rot) rowCls.push(`rot-${rot}`);
+                    if (_nodesFocus === h.name) rowCls.push('active');
                     return `
                         <div class="${rowCls.join(' ')}">
                             <input type="checkbox" class="ms-checkbox"
                                    ${checked}
-                                   onclick="nodesToggle('${safeKey}', this.checked)">
+                                   onclick="event.stopPropagation(); nodesToggle('${safeKey}', this.checked)">
                             <button type="button" class="svc-list-item"
-                                    onclick="nodesToggle('${safeKey}', ${!_nodesCheckSel.has(h.name)})"
+                                    onclick="nodesSelectTab('${safeKey}')"
                                     title="${escapeHtml(h.name)}${rotLabel ? ' — ' + rotLabel : ''}">
                                 <span class="svc-list-text">
                                     <span class="svc-list-name">${escapeHtml(h.name)}</span>
@@ -3519,9 +3560,15 @@
 
         function _nodesPostSelectionChange() {
             renderNodesSidebar();
-            renderNodesContent();
             refreshNodesControls();
         }
+
+        function nodesSelectTab(key) {
+            _nodesFocus = key;
+            renderNodesSidebar();
+            renderNodesContent();
+        }
+        window.nodesSelectTab = nodesSelectTab;
 
         function nodesToggle(key, checked) {
             if (checked) _nodesCheckSel.add(key);
@@ -3585,15 +3632,14 @@
             const box = document.getElementById('nodesContent');
             if (!box) return;
             const selected = [];
-            for (const grp of _allNodes()) {
-                for (const h of grp.hosts) {
-                    if (_nodesCheckSel.has(h.name)) {
-                        selected.push({ ...h, plecho: grp.group });
-                    }
+            if (_nodesFocus) {
+                for (const grp of _allNodes()) {
+                    const m = grp.hosts.find(h => h.name === _nodesFocus);
+                    if (m) { selected.push({ ...m, plecho: grp.group }); break; }
                 }
             }
             if (!selected.length) {
-                box.innerHTML = '<div class="nodes-hint">Выделите ноды слева — появятся их микросервисы и состояние ротации.</div>';
+                box.innerHTML = '<div class="nodes-hint">Нажмите на имя ноды слева — справа появится список её микросервисов и состояние ротации. Чекбоксы — для групповых действий.</div>';
                 return;
             }
             box.innerHTML = selected.map(n => {
@@ -4672,6 +4718,146 @@
         function stopStunnelPolling() {
             if (_stunnelTimer) { clearInterval(_stunnelTimer); _stunnelTimer = null; }
         }
+
+        // ============ ABOUT (documentation) ============
+        let _aboutState = { content: '', updated_at: 0, updated_by: null, editing: false };
+
+        function _fmtAboutMeta(s) {
+            if (!s.updated_at) return '';
+            const d = new Date(s.updated_at * 1000);
+            const time = d.toLocaleTimeString();
+            const date = d.toLocaleDateString();
+            const who = s.updated_by ? ` · ${escapeHtml(s.updated_by)}` : '';
+            return `Обновлено: ${time}, ${date}${who}`;
+        }
+
+        function _renderAboutView() {
+            const view = document.getElementById('aboutView');
+            const meta = document.getElementById('aboutMeta');
+            const actions = document.getElementById('aboutHeaderActions');
+            if (!view || !actions) return;
+            const content = _aboutState.content || '';
+            if (content.trim()) {
+                view.classList.remove('empty');
+                view.textContent = content;
+            } else {
+                view.classList.add('empty');
+                view.textContent = 'Страница пока не заполнена.';
+            }
+            meta.textContent = _fmtAboutMeta(_aboutState);
+            actions.innerHTML = '';
+            if (state.me && state.me.role === 'admin') {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn btn-primary';
+                btn.textContent = 'Редактировать';
+                btn.onclick = startAboutEdit;
+                actions.appendChild(btn);
+            }
+            document.getElementById('aboutView').style.display = '';
+            document.getElementById('aboutEditorWrap').style.display = 'none';
+        }
+
+        async function loadAbout() {
+            const view = document.getElementById('aboutView');
+            if (!view) return;
+            view.classList.remove('empty');
+            view.textContent = 'Загрузка…';
+            try {
+                const resp = await fetch('/api/about');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const d = await resp.json();
+                _aboutState = {
+                    content:    d.content || '',
+                    updated_at: d.updated_at || 0,
+                    updated_by: d.updated_by || null,
+                    editing:    false,
+                };
+                _renderAboutView();
+            } catch (e) {
+                view.classList.add('empty');
+                view.textContent = `Не удалось загрузить: ${e.message}`;
+                document.getElementById('aboutMeta').textContent = '';
+                document.getElementById('aboutHeaderActions').innerHTML = '';
+            }
+        }
+        window.loadAbout = loadAbout;
+
+        function startAboutEdit() {
+            if (!state.me || state.me.role !== 'admin') return;
+            _aboutState.editing = true;
+            const editor = document.getElementById('aboutEditor');
+            const errBox = document.getElementById('aboutEditError');
+            editor.value = _aboutState.content || '';
+            errBox.classList.remove('show');
+            errBox.textContent = '';
+            document.getElementById('aboutView').style.display = 'none';
+            document.getElementById('aboutEditorWrap').style.display = '';
+            const actions = document.getElementById('aboutHeaderActions');
+            actions.innerHTML = '';
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'btn btn-ghost';
+            cancel.textContent = 'Отмена';
+            cancel.onclick = () => cancelAboutEdit();
+            const save = document.createElement('button');
+            save.type = 'button';
+            save.className = 'btn btn-primary';
+            save.id = 'aboutSaveBtn';
+            save.textContent = 'Сохранить';
+            save.onclick = saveAbout;
+            actions.appendChild(cancel);
+            actions.appendChild(save);
+            editor.focus();
+        }
+        window.startAboutEdit = startAboutEdit;
+
+        function cancelAboutEdit(opts) {
+            const silent = !!(opts && opts.silent);
+            if (silent && !_aboutState.editing) return;
+            _aboutState.editing = false;
+            _renderAboutView();
+        }
+        window.cancelAboutEdit = cancelAboutEdit;
+
+        async function saveAbout() {
+            if (!state.me || state.me.role !== 'admin') return;
+            const editor = document.getElementById('aboutEditor');
+            const errBox = document.getElementById('aboutEditError');
+            const saveBtn = document.getElementById('aboutSaveBtn');
+            const content = editor.value;
+            errBox.classList.remove('show');
+            errBox.textContent = '';
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Сохраняю…'; }
+            try {
+                const resp = await fetch('/api/about', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ content }),
+                });
+                const d = await resp.json().catch(() => ({}));
+                if (!resp.ok || !d.ok) {
+                    const msg = d.error || `Ошибка ${resp.status}`;
+                    errBox.textContent = msg;
+                    errBox.classList.add('show');
+                    return;
+                }
+                _aboutState = {
+                    content,
+                    updated_at: d.updated_at || Math.floor(Date.now() / 1000),
+                    updated_by: d.updated_by || (state.me && state.me.username),
+                    editing:    false,
+                };
+                _renderAboutView();
+                toast('Сохранено', 'ok');
+            } catch (e) {
+                errBox.textContent = `Сеть: ${e.message}`;
+                errBox.classList.add('show');
+            } finally {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Сохранить'; }
+            }
+        }
+        window.saveAbout = saveAbout;
 
         // ============ BALANCER CREDS (admin) ============
         async function loadBalancerCreds() {

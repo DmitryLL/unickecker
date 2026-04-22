@@ -348,6 +348,20 @@ def init_db():
         (_now,),
     )
 
+    # Страница «О программе» (одна запись, редактирует только admin)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS about_page (
+            id         INTEGER PRIMARY KEY CHECK (id = 1),
+            content    TEXT NOT NULL DEFAULT '',
+            updated_at INTEGER NOT NULL DEFAULT 0,
+            updated_by TEXT
+        )
+    """)
+    conn.execute(
+        "INSERT OR IGNORE INTO about_page (id, content, updated_at) VALUES (1, '', ?)",
+        (_now,),
+    )
+
     # Группы (плечи)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS ms_groups (
@@ -2591,6 +2605,44 @@ def balancer_creds_set():
     conn.execute(f"UPDATE balancer_credentials SET {', '.join(fields)} WHERE id = ?", args)
     conn.commit()
     return jsonify({"ok": True})
+
+
+ABOUT_MAX_BYTES = 512 * 1024
+
+
+@app.get("/api/about")
+def about_get():
+    _, err = require_route("about")
+    if err: return err
+    row = db().execute(
+        "SELECT content, updated_at, updated_by FROM about_page WHERE id = 1"
+    ).fetchone()
+    if not row:
+        return jsonify({"content": "", "updated_at": 0, "updated_by": None})
+    return jsonify({
+        "content":    row["content"] or "",
+        "updated_at": row["updated_at"] or 0,
+        "updated_by": row["updated_by"],
+    })
+
+
+@app.post("/api/about")
+def about_set():
+    u, err = require_admin()
+    if err: return err
+    data = request.get_json(silent=True) or {}
+    content = data.get("content", "")
+    if not isinstance(content, str):
+        return jsonify({"error": "Поле content должно быть строкой"}), 400
+    if len(content.encode("utf-8")) > ABOUT_MAX_BYTES:
+        return jsonify({"error": f"Превышен лимит {ABOUT_MAX_BYTES // 1024} KB"}), 400
+    now = int(time.time())
+    db().execute(
+        "UPDATE about_page SET content = ?, updated_at = ?, updated_by = ? WHERE id = 1",
+        (content, now, u["username"]),
+    )
+    db().commit()
+    return jsonify({"ok": True, "updated_at": now, "updated_by": u["username"]})
 
 
 def get_balancer_creds():
