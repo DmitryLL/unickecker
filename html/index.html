@@ -520,6 +520,162 @@
         }
 
         /* === Microservices: control bar === */
+        /* === Кнопка «Другие действия» с выпадающим меню === */
+        .svc-more-wrapper { position: relative; display: inline-block; }
+        .svc-more-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #cbd5e1;
+            background: rgba(31, 41, 55, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .svc-more-btn:hover { background: rgba(55, 65, 81, 0.8); border-color: rgba(255, 255, 255, 0.15); }
+        .svc-more-btn .chevron {
+            width: 10px; height: 10px;
+            transition: transform 0.15s;
+        }
+        .svc-more-wrapper.open .svc-more-btn .chevron { transform: rotate(180deg); }
+        .svc-more-menu {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            z-index: 10;
+            min-width: 240px;
+            padding: 6px;
+            background: rgba(17, 24, 39, 0.98);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .svc-more-wrapper.open .svc-more-menu { display: flex; }
+        .svc-more-menu .ms-action-btn { width: 100%; justify-content: flex-start; }
+
+        /* === Режим-переключатель «Микросервисы / Ноды» === */
+        .bal-mode-tabs {
+            display: flex; gap: 2px;
+            padding: 4px;
+            margin-bottom: 10px;
+            background: rgba(17, 24, 39, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            width: max-content;
+        }
+        .bal-mode-tab {
+            padding: 6px 16px;
+            border: 0;
+            background: transparent;
+            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .bal-mode-tab:hover { color: #cbd5e1; background: rgba(255, 255, 255, 0.03); }
+        .bal-mode-tab.active {
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.3), rgba(99, 102, 241, 0.1));
+            color: #fff;
+        }
+        /* === Режим «Ноды»: сайдбар и контент === */
+        #nodesList {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            align-items: start;
+        }
+        .nodes-col { display: flex; flex-direction: column; }
+        .nodes-plecho-list {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2px;
+        }
+        .nodes-plecho-group { margin-bottom: 12px; }
+        .nodes-plecho-group:last-child { margin-bottom: 0; }
+        .nodes-plecho-head {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 8px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+        .nodes-plecho-head .ms-checkbox { margin: 0; }
+        .node-drain-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #a855f7;
+            box-shadow: 0 0 6px rgba(168, 85, 247, 0.6);
+            flex-shrink: 0;
+            display: inline-block;
+        }
+        .nodes-card {
+            margin-bottom: 12px;
+            background: rgba(17, 24, 39, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .nodes-card-head {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 12px;
+            background: rgba(99, 102, 241, 0.08);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+            font-size: 13px;
+            color: #e5e7eb;
+        }
+        .nodes-card-head .plecho-tag {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: #94a3b8;
+            font-family: system-ui, sans-serif;
+            letter-spacing: 0.04em;
+        }
+        .nodes-card-head .role-tag {
+            font-size: 10px;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.04em;
+            font-family: system-ui, sans-serif;
+        }
+        .nodes-card-head .role-tag.master { background: rgba(99, 102, 241, 0.25); color: #c7d2fe; }
+        .nodes-card-head .role-tag.slave  { background: rgba(107, 114, 128, 0.25); color: #cbd5e1; }
+        .nodes-svc-row {
+            display: grid;
+            grid-template-columns: 1fr 90px;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 12px;
+            font-size: 13px;
+            color: #cbd5e1;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .nodes-svc-row:first-child { border-top: 0; }
+        .nodes-svc-row.muted         { color: #6b7280; }
+        .nodes-svc-row.muted .nodes-svc-name { color: #6b7280; }
+        .nodes-svc-name {
+            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .nodes-svc-name .svc-no-balance-icon { width: 13px; height: 13px; flex-shrink: 0; }
+        .nodes-svc-rot { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+        .nodes-svc-rot.in    { color: #86efac; }
+        .nodes-svc-rot.out   { color: #fca5a5; }
+        .nodes-svc-rot.empty { color: #6b7280; }
+        .nodes-hint { color: #94a3b8; font-size: 12px; padding: 10px 6px; }
+
         .svc-controls {
             display: flex; flex-direction: column; gap: 4px;
             margin-bottom: 10px;
@@ -527,7 +683,8 @@
             background: rgba(17, 24, 39, 0.6);
             border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 10px;
-            max-width: 540px;
+            width: max-content;
+            max-width: 100%;
         }
         .svc-controls-row {
             display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -2491,6 +2648,10 @@
             line.innerHTML = `<span class="ts">${ts}</span>${userTag}<span class="msg"></span>`;
             line.querySelector('.msg').textContent = entry.message || '';
             box.appendChild(line);
+            // Обрезаем самые старые строки, если выросло выше лимита
+            while (box.childElementCount > SVC_LOG_DOM_MAX) {
+                box.removeChild(box.firstElementChild);
+            }
             if (nearBottom) box.scrollTop = box.scrollHeight;
         }
 
@@ -3072,69 +3233,487 @@
             if (_svcSelected && !_svcIndex[_svcSelected]) _svcSelected = null;
             root.innerHTML = `
                 <div id="svcRunBanner" style="display:none"></div>
-                <div class="svc-controls">
-                    <div class="svc-controls-row svc-controls-buttons">
-                        <button type="button" class="ms-action-btn restart" id="svcRestartBtn"    onclick="svcAction('restart')">Перезагрузить с балансировкой</button>
-                        <button type="button" class="ms-action-btn restart" id="svcRestartRawBtn" onclick="svcAction('restart_raw')">Перезагрузка без балансировки</button>
+                <div class="bal-mode-tabs">
+                    <button type="button" class="bal-mode-tab ${_balMode === 'services' ? 'active' : ''}" onclick="setBalMode('services')">Микросервисы</button>
+                    <button type="button" class="bal-mode-tab ${_balMode === 'nodes' ? 'active' : ''}" onclick="setBalMode('nodes')">Ноды</button>
+                </div>
+                <div id="svcModeServices" style="${_balMode === 'services' ? '' : 'display:none'}">
+                    <div class="svc-controls">
+                        <div class="svc-controls-row svc-controls-buttons">
+                            <button type="button" class="ms-action-btn restart" id="svcRestartBtn" onclick="svcAction('restart')">Перезагрузить с балансировкой</button>
+                            <div class="svc-more-wrapper" id="svcMoreWrap">
+                                <button type="button" class="svc-more-btn" onclick="toggleSvcMore(event)">
+                                    Другие действия
+                                    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                                <div class="svc-more-menu">
+                                    <button type="button" class="ms-action-btn restart" id="svcRestartRawBtn" onclick="svcAction('restart_raw')">Перезагрузка без балансировки</button>
+                                    <button type="button" class="ms-action-btn stop"    id="svcDrainBtn"      onclick="svcAction('drain')">Вывести из ротации</button>
+                                    <button type="button" class="ms-action-btn start"   id="svcReturnBtn"     onclick="svcAction('return')">Ввести в ротацию</button>
+                                    <button type="button" class="ms-action-btn stop"    id="svcStopBtn"       onclick="svcAction('stop')">Выключить микросервисы</button>
+                                    <button type="button" class="ms-action-btn start"   id="svcStartBtn"      onclick="svcAction('start')">Включить микросервисы</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="svc-controls-row svc-controls-buttons">
-                        <button type="button" class="ms-action-btn stop"  id="svcStopBtn"  onclick="svcAction('stop')">Выключить микросервисы</button>
-                        <button type="button" class="ms-action-btn start" id="svcStartBtn" onclick="svcAction('start')">Включить микросервисы</button>
-                    </div>
-                    <div class="svc-controls-row svc-controls-buttons">
-                        <button type="button" class="ms-action-btn stop"  id="svcDrainBtn"  onclick="svcAction('drain')">Вывести из ротации</button>
-                        <button type="button" class="ms-action-btn start" id="svcReturnBtn" onclick="svcAction('return')">Ввести в ротацию</button>
+                    <div class="svc-layout">
+                        <div class="svc-sidebar">
+                            <div class="svc-sidebar-head">
+                                <label class="svc-sidebar-selectall">
+                                    <input type="checkbox" class="ms-checkbox" id="svcSelectAllCb"
+                                           onchange="svcSelectAll(this.checked)">
+                                    <span>Выделить все</span>
+                                </label>
+                                <div class="svc-sidebar-legend">
+                                    <svg class="svc-no-balance-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M16 16l3-8 3 8c-2 1-4 1-6 0z"/>
+                                        <path d="M2 16l3-8 3 8c-2 1-4 1-6 0z"/>
+                                        <path d="M7 21h10"/>
+                                        <path d="M12 3v18"/>
+                                        <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
+                                        <line x1="3" y1="3" x2="21" y2="21" stroke="#ef4444" stroke-width="2.2"/>
+                                    </svg>
+                                    <span>не балансируется</span>
+                                </div>
+                                <button type="button" class="svc-tool-btn" id="svcRefreshBtn" onclick="svcRefreshAll()" title="Заново опросить статусы всех микросервисов">⟳ Обновить статусы</button>
+                            </div>
+                            <div class="svc-sidebar-list" id="svcList"></div>
+                        </div>
+                        <div class="svc-content" id="svcContent"></div>
+                        <div class="svc-console-box">
+                            <div class="svc-console-half">
+                                <div class="ms-console-header">
+                                    <span class="ms-console-title">Лог действий</span>
+                                </div>
+                                <div class="ms-console svc-log-actions" id="svcConsole"></div>
+                            </div>
+                            <div class="svc-console-half svc-console-errors-half">
+                                <div class="ms-console-header">
+                                    <span class="ms-console-title" style="color:#fca5a5">Лог ошибок</span>
+                                </div>
+                                <div class="ms-console svc-log-errors" id="svcConsoleErrors"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="svc-layout">
-                    <div class="svc-sidebar">
-                        <div class="svc-sidebar-head">
-                            <label class="svc-sidebar-selectall">
-                                <input type="checkbox" class="ms-checkbox" id="svcSelectAllCb"
-                                       onchange="svcSelectAll(this.checked)">
-                                <span>Выделить все</span>
-                            </label>
-                            <div class="svc-sidebar-legend">
-                                <svg class="svc-no-balance-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M16 16l3-8 3 8c-2 1-4 1-6 0z"/>
-                                    <path d="M2 16l3-8 3 8c-2 1-4 1-6 0z"/>
-                                    <path d="M7 21h10"/>
-                                    <path d="M12 3v18"/>
-                                    <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
-                                    <line x1="3" y1="3" x2="21" y2="21" stroke="#ef4444" stroke-width="2.2"/>
-                                </svg>
-                                <span>не балансируется</span>
-                            </div>
-                            <button type="button" class="svc-tool-btn" id="svcRefreshBtn" onclick="svcRefreshAll()" title="Заново опросить статусы всех микросервисов">⟳ Обновить статусы</button>
+                <div id="svcModeNodes" style="${_balMode === 'nodes' ? '' : 'display:none'}">
+                    <div class="svc-controls">
+                        <div class="svc-controls-row svc-controls-buttons">
+                            <button type="button" class="ms-action-btn stop"  id="nodesDrainBtn"  onclick="nodesAction('drain')">Вывести из ротации</button>
+                            <button type="button" class="ms-action-btn start" id="nodesReturnBtn" onclick="nodesAction('return')">Ввести в ротацию</button>
                         </div>
-                        <div class="svc-sidebar-list" id="svcList"></div>
                     </div>
-                    <div class="svc-content" id="svcContent"></div>
-                    <div class="svc-console-box">
-                        <div class="svc-console-half">
-                            <div class="ms-console-header">
-                                <span class="ms-console-title">Лог действий</span>
+                    <div class="svc-layout">
+                        <div class="svc-sidebar">
+                            <div class="svc-sidebar-head">
+                                <label class="svc-sidebar-selectall">
+                                    <input type="checkbox" class="ms-checkbox" id="nodesSelectAllCb"
+                                           onchange="nodesSelectAll(this.checked)">
+                                    <span>Выделить все</span>
+                                </label>
+                                <button type="button" class="svc-tool-btn" onclick="nodesRefresh()" title="Опросить ротацию по выделенным нодам">⟳ Обновить ротацию</button>
                             </div>
-                            <div class="ms-console" id="svcConsole"></div>
+                            <div id="nodesList"></div>
                         </div>
-                        <div class="svc-console-half svc-console-errors-half">
-                            <div class="ms-console-header">
-                                <span class="ms-console-title" style="color:#fca5a5">Лог ошибок</span>
+                        <div class="svc-content" id="nodesContent"></div>
+                        <div class="svc-console-box">
+                            <div class="svc-console-half">
+                                <div class="ms-console-header">
+                                    <span class="ms-console-title">Лог действий</span>
+                                </div>
+                                <div class="ms-console svc-log-actions" id="nodesConsole"></div>
                             </div>
-                            <div class="ms-console" id="svcConsoleErrors"></div>
+                            <div class="svc-console-half svc-console-errors-half">
+                                <div class="ms-console-header">
+                                    <span class="ms-console-title" style="color:#fca5a5">Лог ошибок</span>
+                                </div>
+                                <div class="ms-console svc-log-errors" id="nodesConsoleErrors"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
             `;
-            renderSvcSidebar();
-            renderSvcContent();
-            refreshSvcControls();
-            if (_svcSelected) startSvcPolling();
-            else stopSvcPolling();
-            startSvcAllHealthPoll();
+            if (_balMode === 'services') {
+                renderSvcSidebar();
+                renderSvcContent();
+                refreshSvcControls();
+                if (_svcSelected) startSvcPolling();
+                else stopSvcPolling();
+                startSvcAllHealthPoll();
+            } else {
+                renderNodesSidebar();
+                renderNodesContent();
+                refreshNodesControls();
+                stopSvcPolling();
+                stopSvcAllHealthPoll();
+                fetchNodesRotation();
+            }
             startSvcOrchPolling();
         }
         window.renderMicroservicesList = renderMicroservicesList;
+
+        // ============ Меню «Другие действия» ============
+        function toggleSvcMore(ev) {
+            ev?.stopPropagation();
+            const wrap = document.getElementById('svcMoreWrap');
+            if (!wrap) return;
+            wrap.classList.toggle('open');
+        }
+        window.toggleSvcMore = toggleSvcMore;
+        document.addEventListener('click', (e) => {
+            const wrap = document.getElementById('svcMoreWrap');
+            if (!wrap || !wrap.classList.contains('open')) return;
+            if (!wrap.contains(e.target)) wrap.classList.remove('open');
+        });
+
+        // ============ РЕЖИМ-ПЕРЕКЛЮЧАТЕЛЬ ============
+        let _balMode = 'services';   // 'services' | 'nodes'
+        function setBalMode(mode) {
+            if (mode !== 'services' && mode !== 'nodes') return;
+            if (_balMode === mode) return;
+            _balMode = mode;
+            // Не перерисовываем всё дерево (иначе лог обнулится) — просто переключаем display и
+            // подстраиваем поллинги.
+            const svcEl  = document.getElementById('svcModeServices');
+            const nodeEl = document.getElementById('svcModeNodes');
+            if (svcEl)  svcEl.style.display  = mode === 'services' ? '' : 'none';
+            if (nodeEl) nodeEl.style.display = mode === 'nodes'    ? '' : 'none';
+            document.querySelectorAll('.bal-mode-tab').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.querySelector(`.bal-mode-tab[onclick="setBalMode('${mode}')"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+            if (mode === 'services') {
+                if (_svcSelected) startSvcPolling();
+                startSvcAllHealthPoll();
+            } else {
+                stopSvcPolling();
+                stopSvcAllHealthPoll();
+                renderNodesSidebar();
+                renderNodesContent();
+                refreshNodesControls();
+                fetchNodesRotation();
+            }
+        }
+        window.setBalMode = setBalMode;
+
+        // ============ РЕЖИМ «НОДЫ» ============
+        const _nodesCheckSel = new Set();               // node_key
+        const _nodesRotation = {};                      // node_key → { svc: true|false|null }
+
+        function _allNodes() {
+            // [{plecho, hosts:[{name, svcs:[...]}]}]
+            return HOST_MS_LIST || [];
+        }
+
+        function _nodesBalancedSvcs(node) {
+            return (node.svcs || []).filter(s => !NOT_BALANCED_SVCS.has(s));
+        }
+
+        function renderNodesSidebar() {
+            const list = document.getElementById('nodesList');
+            if (!list) return;
+            const groups = _allNodes();
+            if (!groups.length) {
+                list.innerHTML = '<div class="nodes-hint">Нет нод — добавьте их в «Каталоге нод».</div>';
+                return;
+            }
+            const renderGroup = (grp) => {
+                const total = grp.hosts.length;
+                const sel   = grp.hosts.filter(h => _nodesCheckSel.has(h.name)).length;
+                const allChk = sel === total && total > 0;
+                const safeGroup = escapeHtml(grp.group).replace(/'/g, "\\'");
+                const rows = grp.hosts.map(h => {
+                    const checked = _nodesCheckSel.has(h.name) ? 'checked' : '';
+                    const safeKey = h.name.replace(/'/g, "\\'");
+                    const drained = _nodeHasDrain(h.name);
+                    return `
+                        <div class="svc-list-row">
+                            <input type="checkbox" class="ms-checkbox"
+                                   ${checked}
+                                   onclick="nodesToggle('${safeKey}', this.checked)">
+                            <button type="button" class="svc-list-item"
+                                    onclick="nodesToggle('${safeKey}', ${!_nodesCheckSel.has(h.name)})"
+                                    title="${escapeHtml(h.name)}${drained ? ' — есть сервисы вне ротации' : ''}">
+                                <span class="svc-list-text">
+                                    <span class="svc-list-name">${escapeHtml(h.name)}</span>
+                                    ${drained ? '<span class="node-drain-dot" title="Есть сервисы вне ротации"></span>' : ''}
+                                </span>
+                            </button>
+                        </div>`;
+                }).join('');
+                return `
+                    <div class="nodes-plecho-group">
+                        <div class="nodes-plecho-head">
+                            <input type="checkbox" class="ms-checkbox"
+                                   data-nodes-plecho="${escapeHtml(grp.group)}"
+                                   ${allChk ? 'checked' : ''}
+                                   onchange="nodesTogglePlecho('${safeGroup}', this.checked)">
+                            <span>${escapeHtml(grp.group)}</span>
+                        </div>
+                        <div class="nodes-plecho-list">${rows}</div>
+                    </div>`;
+            };
+            const isLeft = (key) => /^itl/i.test(key) && !/^itlr/i.test(key);
+            const leftGroups  = groups.filter(g => isLeft(g.group));
+            let rightGroups = groups.filter(g => !isLeft(g.group));
+            // itlr располагаем сразу после gate
+            const itlrIdx = rightGroups.findIndex(g => /^itlr/i.test(g.group));
+            if (itlrIdx !== -1) {
+                const [itlrGrp] = rightGroups.splice(itlrIdx, 1);
+                const gateIdx = rightGroups.findIndex(g => g.group.toLowerCase() === 'gate');
+                const insertAt = gateIdx === -1 ? rightGroups.length : gateIdx + 1;
+                rightGroups.splice(insertAt, 0, itlrGrp);
+            }
+            list.innerHTML = `
+                <div class="nodes-col">${leftGroups.map(renderGroup).join('')}</div>
+                <div class="nodes-col">${rightGroups.map(renderGroup).join('')}</div>
+            `;
+            // indeterminate для плеч
+            for (const grp of groups) {
+                const total = grp.hosts.length;
+                const sel   = grp.hosts.filter(h => _nodesCheckSel.has(h.name)).length;
+                const cb = list.querySelector(`input[data-nodes-plecho="${CSS.escape(grp.group)}"]`);
+                if (cb) cb.indeterminate = sel > 0 && sel < total;
+            }
+            // «Выделить все»
+            const allTotal = groups.reduce((n, g) => n + g.hosts.length, 0);
+            const allSel   = _nodesCheckSel.size;
+            const allCb = document.getElementById('nodesSelectAllCb');
+            if (allCb) {
+                allCb.checked = allSel === allTotal && allTotal > 0;
+                allCb.indeterminate = allSel > 0 && allSel < allTotal;
+            }
+        }
+
+        function _nodesPostSelectionChange() {
+            renderNodesSidebar();
+            renderNodesContent();
+            refreshNodesControls();
+        }
+
+        function nodesToggle(key, checked) {
+            if (checked) _nodesCheckSel.add(key);
+            else _nodesCheckSel.delete(key);
+            _nodesPostSelectionChange();
+        }
+        window.nodesToggle = nodesToggle;
+
+        function nodesTogglePlecho(plecho, checked) {
+            const grp = _allNodes().find(g => g.group === plecho);
+            if (!grp) return;
+            for (const h of grp.hosts) {
+                if (checked) _nodesCheckSel.add(h.name);
+                else _nodesCheckSel.delete(h.name);
+            }
+            _nodesPostSelectionChange();
+        }
+        window.nodesTogglePlecho = nodesTogglePlecho;
+
+        function nodesSelectAll(checked) {
+            for (const g of _allNodes()) {
+                for (const h of g.hosts) {
+                    if (checked) _nodesCheckSel.add(h.name);
+                    else _nodesCheckSel.delete(h.name);
+                }
+            }
+            _nodesPostSelectionChange();
+        }
+        window.nodesSelectAll = nodesSelectAll;
+
+        function refreshNodesControls() {
+            const n = _nodesCheckSel.size;
+            const drain = document.getElementById('nodesDrainBtn');
+            const retrn = document.getElementById('nodesReturnBtn');
+            if (drain) drain.disabled = (n === 0);
+            if (retrn) retrn.disabled = (n === 0);
+        }
+
+        function _nodeRotCell(nodeKey, svc) {
+            if (NOT_BALANCED_SVCS.has(svc)) {
+                return { cls: 'empty', text: '' };
+            }
+            const r = _nodesRotation[nodeKey]?.[svc];
+            if (r === true)  return { cls: 'in',  text: 'ДА' };
+            if (r === false) return { cls: 'out', text: 'НЕТ' };
+            return { cls: 'empty', text: '—' };
+        }
+
+        const _NOT_BALANCED_SVG = `
+            <svg class="svc-no-balance-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <title>Не балансируется</title>
+                <path d="M16 16l3-8 3 8c-2 1-4 1-6 0z"/>
+                <path d="M2 16l3-8 3 8c-2 1-4 1-6 0z"/>
+                <path d="M7 21h10"/>
+                <path d="M12 3v18"/>
+                <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
+                <line x1="3" y1="3" x2="21" y2="21" stroke="#ef4444" stroke-width="2.2"/>
+            </svg>`;
+
+        function renderNodesContent() {
+            const box = document.getElementById('nodesContent');
+            if (!box) return;
+            const selected = [];
+            for (const grp of _allNodes()) {
+                for (const h of grp.hosts) {
+                    if (_nodesCheckSel.has(h.name)) {
+                        selected.push({ ...h, plecho: grp.group });
+                    }
+                }
+            }
+            if (!selected.length) {
+                box.innerHTML = '<div class="nodes-hint">Выделите ноды слева — появятся их микросервисы и состояние ротации.</div>';
+                return;
+            }
+            box.innerHTML = selected.map(n => {
+                const svcs = n.svcs.slice().sort((a, b) => a.localeCompare(b));
+                const rows = svcs.length
+                    ? svcs.map(s => {
+                        const cell = _nodeRotCell(n.name, s);
+                        const notBal = NOT_BALANCED_SVCS.has(s);
+                        return `
+                            <div class="nodes-svc-row${notBal ? ' muted' : ''}">
+                                <span class="nodes-svc-name">${escapeHtml(s)}${notBal ? _NOT_BALANCED_SVG : ''}</span>
+                                <span class="nodes-svc-rot ${cell.cls}">${cell.text}</span>
+                            </div>`;
+                      }).join('')
+                    : '<div class="nodes-hint">На этой ноде нет привязанных микросервисов.</div>';
+                return `
+                    <div class="nodes-card">
+                        <div class="nodes-card-head">
+                            <span>${escapeHtml(n.name)}</span>
+                            <span class="plecho-tag">${escapeHtml(n.plecho)}</span>
+                        </div>
+                        ${rows}
+                    </div>`;
+            }).join('');
+        }
+
+        async function fetchNodesRotation() {
+            // Опрашиваем ротацию сразу по всем нодам каталога — чтобы фиолетовый кружок
+            // показывал «выведена из ротации» даже для невыделенных.
+            const svcToHosts = {};
+            for (const grp of _allNodes()) {
+                for (const h of grp.hosts) {
+                    for (const s of (h.svcs || [])) {
+                        if (NOT_BALANCED_SVCS.has(s)) continue;
+                        (svcToHosts[s] ??= new Set()).add(h.name);
+                    }
+                }
+            }
+            const queries = Object.keys(svcToHosts).map(s => ({ service: s, hosts: [...svcToHosts[s]] }));
+            if (!queries.length) { renderNodesSidebar(); renderNodesContent(); return; }
+            try {
+                const r = await fetch('/api/svc/rotation', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({queries}),
+                });
+                if (!r.ok) return;
+                const d = await r.json();
+                const results = d.results || {};
+                for (const svc of Object.keys(results)) {
+                    for (const [nodeKey, val] of Object.entries(results[svc])) {
+                        (_nodesRotation[nodeKey] ??= {})[svc] = val;
+                    }
+                }
+                renderNodesSidebar();
+                renderNodesContent();
+            } catch {}
+        }
+
+        function _nodeHasDrain(nodeKey) {
+            const byNode = _nodesRotation[nodeKey];
+            if (!byNode) return false;
+            return Object.values(byNode).some(v => v === false);
+        }
+
+        async function nodesRefresh() {
+            await fetchNodesRotation();
+            toast('Ротация обновлена', 'ok');
+        }
+        window.nodesRefresh = nodesRefresh;
+
+        async function nodesAction(action) {
+            if (!['drain', 'return'].includes(action)) return;
+            const items = [];
+            for (const grp of _allNodes()) {
+                for (const h of grp.hosts) {
+                    if (!_nodesCheckSel.has(h.name)) continue;
+                    for (const s of (h.svcs || [])) {
+                        if (NOT_BALANCED_SVCS.has(s)) continue;
+                        items.push({ host: h.name, service: s });
+                    }
+                }
+            }
+            if (!items.length) {
+                toast('Среди выделенных нод нет балансируемых микросервисов', 'warn');
+                return;
+            }
+            const meta = {
+                drain:  { title: 'Вывод нод из ротации', verb: 'вывести из ротации', ok: 'Вывести', kind: 'warn',    cls: 'btn-warn'    },
+                return: { title: 'Ввод нод в ротацию',   verb: 'ввести в ротацию',   ok: 'Ввести',  kind: 'success', cls: 'btn-success' },
+            }[action];
+
+            // Группируем по плечу → ноде
+            const hostGroup = {};
+            for (const g of _allNodes()) for (const h of g.hosts) hostGroup[h.name] = g.group;
+            const shoulderOrder = _allNodes().map(g => g.group);
+            const byNode = {};
+            for (const it of items) (byNode[it.host] ??= new Set()).add(it.service);
+
+            const selectedNodeKeys = [...new Set(items.map(i => i.host))];
+            const nodesBySh = {};
+            for (const k of selectedNodeKeys) {
+                const sh = hostGroup[k] || '—';
+                (nodesBySh[sh] ??= []).push(k);
+            }
+            const groups = shoulderOrder.filter(sh => nodesBySh[sh]).map(sh => {
+                const nodes = nodesBySh[sh].sort((a, b) => a.localeCompare(b));
+                const subgroups = nodes.map(k => ({
+                    label: k,
+                    hosts: [...byNode[k]].sort((a, b) => a.localeCompare(b)),
+                }));
+                return { title: sh, total: nodes.length, subgroups };
+            });
+
+            const flags = [
+                { label: `${selectedNodeKeys.length} ${selectedNodeKeys.length === 1 ? 'нода' : 'нод'}` },
+                { label: `${items.length} пар (сервис × нода)` },
+                { label: '⚖ С балансировкой' },
+            ];
+            const ok = await confirmModal({
+                title: meta.title,
+                message: 'Действие будет применено ко всем балансируемым микросервисам на выделенных нодах.',
+                groups,
+                flags,
+                kind: meta.kind,
+                confirmText: meta.ok,
+                confirmClass: meta.cls,
+            });
+            if (!ok) return;
+            try {
+                const resp = await fetch('/api/svc/orchestrate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ action, nodes: items }),
+                });
+                if (resp.status === 409) {
+                    const data = await resp.json().catch(() => ({}));
+                    const cur = data.current || {};
+                    toast(`Уже идёт операция «${cur.action || '?'}» от ${cur.username || '?'}`, 'err');
+                    return;
+                }
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    toast(data.error || `Ошибка ${resp.status}`, 'err');
+                    return;
+                }
+                fetchSvcRunState();
+                fetchSvcServerLog();
+            } catch (e) {
+                toast(`Сеть: ${e.message}`, 'err');
+            }
+        }
+        window.nodesAction = nodesAction;
 
         function renderSvcSidebar() {
             const all = Object.keys(_svcIndex).sort((a, b) => a.localeCompare(b));
@@ -3309,6 +3888,7 @@
         let _svcBusyHealthTimer = null;
         let _svcWasBusy = false;
 
+        const SVC_LOG_DOM_MAX = 2000;   // максимум строк лога в DOM — страховка от утечки RAM
         function _appendSvcLogLine(target, e) {
             if (!target) return;
             const nearBottom = (target.scrollHeight - target.scrollTop - target.clientHeight) < 40;
@@ -3319,6 +3899,10 @@
             line.innerHTML = `<span class="ts">${ts}</span>${u}<span class="msg"></span>`;
             line.querySelector('.msg').textContent = e.message || '';
             target.appendChild(line);
+            // Обрезаем самые старые строки, если выросло выше лимита
+            while (target.childElementCount > SVC_LOG_DOM_MAX) {
+                target.removeChild(target.firstElementChild);
+            }
             if (nearBottom) target.scrollTop = target.scrollHeight;
         }
 
@@ -3328,14 +3912,14 @@
                 const resp = await fetch(url);
                 if (!resp.ok) return;
                 const data = await resp.json();
-                const tgtA = document.getElementById('svcConsole');
-                const tgtE = document.getElementById('svcConsoleErrors');
+                const tgtsA = document.querySelectorAll('.svc-log-actions');
+                const tgtsE = document.querySelectorAll('.svc-log-errors');
                 for (const e of (data.actions || [])) {
-                    _appendSvcLogLine(tgtA, e);
+                    tgtsA.forEach(t => _appendSvcLogLine(t, e));
                     if (e.id > _svcLogLastIds.action) _svcLogLastIds.action = e.id;
                 }
                 for (const e of (data.errors || [])) {
-                    _appendSvcLogLine(tgtE, e);
+                    tgtsE.forEach(t => _appendSvcLogLine(t, e));
                     if (e.id > _svcLogLastIds.error) _svcLogLastIds.error = e.id;
                 }
             } catch {}

@@ -1406,8 +1406,9 @@ def api_db_test():
         return jsonify({"status": "fail", "error": str(e)})
 
 
-# ===== Microservices console log (shared, 7-day retention) =====
+# ===== Microservices console log (shared, 7-day retention, 50k-row hard cap) =====
 MS_CONSOLE_RETENTION_SEC = 7 * 24 * 3600
+MS_CONSOLE_MAX_ROWS      = 50_000
 
 def ms_console_append(level, message, username=None):
     try:
@@ -1421,6 +1422,14 @@ def ms_console_append(level, message, username=None):
             conn.execute(
                 "DELETE FROM ms_console WHERE ts < ?",
                 (now - MS_CONSOLE_RETENTION_SEC,),
+            )
+            # Жёсткий cap по числу строк — на случай всплеска логирования,
+            # когда ретеншн по времени ещё не сработал.
+            conn.execute(
+                "DELETE FROM ms_console WHERE id NOT IN ("
+                "  SELECT id FROM ms_console ORDER BY id DESC LIMIT ?"
+                ")",
+                (MS_CONSOLE_MAX_ROWS,),
             )
             conn.commit()
         finally:
@@ -2675,6 +2684,7 @@ def ms_groups_delete(key):
 # ============================================================
 
 SVC_CONSOLE_RETENTION_SEC = 7 * 24 * 3600
+SVC_CONSOLE_MAX_ROWS_PER_KIND = 50_000  # hard cap: 50k для 'action' и столько же для 'error'
 INCEPTUM_POLL_INTERVAL = 3       # секунды между опросами /api/instances
 INCEPTUM_BALANCE_WAIT  = 60      # пауза для разбалансировки nginx между шагами
 INCEPTUM_HANG_WARN_SEC = 60      # через сколько начинаем писать «зависло»
@@ -2694,6 +2704,14 @@ def svc_log(kind, level, message, run_id=None, username=None):
             conn.execute(
                 "DELETE FROM svc_console WHERE ts < ?",
                 (now - SVC_CONSOLE_RETENTION_SEC,),
+            )
+            # Жёсткий cap по числу строк отдельно для каждого kind ('action' / 'error'),
+            # на случай всплеска логирования, когда ретеншн по времени ещё не сработал.
+            conn.execute(
+                "DELETE FROM svc_console WHERE kind = ? AND id NOT IN ("
+                "  SELECT id FROM svc_console WHERE kind = ? ORDER BY id DESC LIMIT ?"
+                ")",
+                (kind, kind, SVC_CONSOLE_MAX_ROWS_PER_KIND),
             )
             conn.commit()
         finally:
