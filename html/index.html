@@ -1074,6 +1074,25 @@
         .svc-list-row.bad.active .svc-list-item::before {
             transform: scale(1.2);
         }
+        /* Перекрашиваем левый кружок в фиолетовый, если у сервиса есть выведенные ноды
+           (имеет приоритет над health-цветом). */
+        .svc-list-row.drained .svc-list-item::before {
+            background: #a855f7;
+            box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.3);
+        }
+        /* Тот же левый кружок на вкладке «Ноды» показывает состояние ротации ноды. */
+        .svc-list-row.rot-in .svc-list-item::before {
+            background: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.28);
+        }
+        .svc-list-row.rot-partial .svc-list-item::before {
+            background: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.28);
+        }
+        .svc-list-row.rot-out .svc-list-item::before {
+            background: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.32);
+        }
         .svc-content {
             flex: 0 0 470px;
             min-width: 0;
@@ -3438,8 +3457,10 @@
                                    : rot === 'out' ? 'Все балансируемые сервисы выведены из ротации'
                                    : rot === 'partial' ? 'Часть сервисов выведена из ротации'
                                    : '';
+                    const rowCls = ['svc-list-row'];
+                    if (rot) rowCls.push(`rot-${rot}`);
                     return `
-                        <div class="svc-list-row">
+                        <div class="${rowCls.join(' ')}">
                             <input type="checkbox" class="ms-checkbox"
                                    ${checked}
                                    onclick="nodesToggle('${safeKey}', this.checked)">
@@ -3448,7 +3469,6 @@
                                     title="${escapeHtml(h.name)}${rotLabel ? ' — ' + rotLabel : ''}">
                                 <span class="svc-list-text">
                                     <span class="svc-list-name">${escapeHtml(h.name)}</span>
-                                    ${rot ? `<span class="node-rot-dot ${rot}" title="${rotLabel}"></span>` : ''}
                                 </span>
                             </button>
                         </div>`;
@@ -3768,6 +3788,7 @@
                 if (s === _svcSelected) cls.push('active');
                 if (_svcHealth[s]) cls.push(_svcHealth[s]); // 'ok' | 'warn' | 'bad'
                 const drained = _svcHasDrain(s);
+                if (drained) cls.push('drained');
                 return `
                     <div class="${cls.join(' ')}">
                         <input type="checkbox" class="ms-checkbox"
@@ -3789,7 +3810,6 @@
                                         <line x1="3" y1="3" x2="21" y2="21" stroke="#ef4444" stroke-width="2.2"/>
                                     </svg>
                                 ` : ''}
-                                ${drained ? '<span class="node-drain-dot" title="Есть ноды вне ротации"></span>' : ''}
                             </span>
                         </button>
                     </div>`;
