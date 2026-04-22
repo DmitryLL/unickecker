@@ -1685,7 +1685,7 @@
             </section>
 
             <!-- MICROSERVICES (host → list of services) -->
-            <section data-route="microservices">
+            <section data-route="Balancer">
                 <div id="msListRoot"></div>
             </section>
 
@@ -1721,7 +1721,7 @@
                 <div class="page-header">
                     <div>
                         <h1 class="page-title">Каталог нод для микросервисов</h1>
-                        <div class="page-sub">Список нод, которые можно назначить микросервисам в «Каталоге микросервисов» (тот, в свою очередь, питает вкладку «Микросервисы»)</div>
+                        <div class="page-sub">Список нод, которые можно назначить микросервисам в «Каталоге микросервисов» (тот, в свою очередь, питает вкладку «Балансировка»)</div>
                         <button type="button" class="btn btn-primary" onclick="openMsGroupCreator()" style="margin-top:12px">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                             Добавить плечо
@@ -1933,7 +1933,7 @@
             users:         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
             operations:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
             services:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
-            microservices: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="20" cy="18" r="2"/></svg>',
+            Balancer:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="20" cy="18" r="2"/></svg>',
             db_connection: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></svg>',
             ms_catalog:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M4 14h6v6H4z"/><path d="M14 14h6v6h-6z"/></svg>',
             nodes_catalog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><circle cx="7" cy="7" r="0.6" fill="currentColor"/><circle cx="7" cy="17" r="0.6" fill="currentColor"/></svg>',
@@ -2135,7 +2135,7 @@
                 if (msPollTimeout) { clearTimeout(msPollTimeout); msPollTimeout = null; }
                 msConsoleStopPolling();
             }
-            if (route === 'microservices') renderMicroservicesList();
+            if (route === 'Balancer') renderMicroservicesList();
             else { stopSvcPolling(); stopSvcAllHealthPoll(); stopSvcOrchPolling(); }
         }
 

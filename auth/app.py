@@ -58,7 +58,7 @@ SESSION_TTL = 60 * 60 * 24 * 7
 ROUTES = [
     {"key": "operations",    "title": "Статусы операций",  "group": "main"},
     {"key": "services",      "title": "Службы",            "group": "main"},
-    {"key": "microservices", "title": "Микросервисы",      "group": "main"},
+    {"key": "Balancer",      "title": "Балансировка",      "group": "main"},
     {"key": "stunnel",       "title": "Stunnel",           "group": "main"},
     {"key": "users",            "title": "Пользователи",         "group": "settings", "admin_only": True},
     {"key": "db_connection",    "title": "Подключение к БД",     "group": "settings"},
@@ -405,6 +405,16 @@ def init_db():
                     "INSERT OR IGNORE INTO ms_catalog_nodes (catalog_id, node_key) VALUES (?, ?)",
                     (cid, _nk),
                 )
+    # Миграция: переименование route key microservices → Balancer в permissions пользователей
+    rows = conn.execute("SELECT id, permissions FROM users WHERE permissions LIKE '%microservices%'").fetchall()
+    for r in rows:
+        try:
+            perms = json.loads(r[1] or "[]")
+        except Exception:
+            continue
+        if "microservices" in perms:
+            perms = ["Balancer" if p == "microservices" else p for p in perms]
+            conn.execute("UPDATE users SET permissions = ? WHERE id = ?", (json.dumps(perms), r[0]))
     conn.commit()
     conn.close()
 
@@ -2016,7 +2026,7 @@ def ms_all_status():
     body: {queries: [{service, nodes: [...]}]}
     return: {results: {service: {node_key: state}}, versions: {svc: {node_key: ver}}, process_ids: {svc: {node_key: pid}}}
     """
-    _, err = require_route("microservices")
+    _, err = require_route("Balancer")
     if err: return err
     data = request.get_json(silent=True) or {}
     queries = data.get("queries") or []
@@ -2085,7 +2095,7 @@ def ms_all_status():
 @app.post("/api/ms/svc-status")
 def ms_svc_status():
     """Опрос произвольного микросервиса по списку нод через Inceptum REST."""
-    _, err = require_route("microservices")
+    _, err = require_route("Balancer")
     if err: return err
     data = request.get_json(silent=True) or {}
     service = (data.get("service") or "").strip()
@@ -2299,7 +2309,6 @@ def ms_node_create():
         (key, group_key, host, service, role, pos, now, now),
     )
     conn.commit()
-    ms_console_append("ok", f"+ добавлен хост {key} (группа {group_key}, host={host}, service={service}{', role=' + role if role else ''})", u["username"])
     return jsonify({"ok": True, "key": key})
 
 
@@ -2390,7 +2399,7 @@ def _serialize_catalog_row(row, nodes):
 def ms_catalog_list():
     # Чтение доступно любому, у кого есть права на «Микросервисы»
     # (запись по-прежнему только админу).
-    _, err = require_route("microservices")
+    _, err = require_route("Balancer")
     if err: return err
     rows = db().execute(
         "SELECT id, name, balancer_paths, position FROM ms_catalog "
@@ -3042,6 +3051,15 @@ def _orch_run(action, pairs, run_id, username):
             sudo_pwd = (creds or {}).get("ssh_sudo_pwd") or ""
             plecho_keys = [g for g in group_order if g in plechos]
 
+            # ---- Upfront nginx -t: до любых правок ----
+            if ssh is not None:
+                try:
+                    _nginx_test(ssh, sudo_pwd)
+                    svc_log("action", "info", "nginx -t ok — можно начинать", run_id)
+                except BalancerError as e:
+                    svc_log("error", "err", f"nginx -t упал до начала операций: {e}\nSTOP", run_id)
+                    return
+
             # ---- DRAIN-only ----
             if action == "drain":
                 for gk in plecho_keys:
@@ -3169,7 +3187,7 @@ def _orch_run(action, pairs, run_id, username):
 # ===== Endpoints оркестратора =====
 @app.post("/api/svc/orchestrate")
 def svc_orchestrate():
-    u, err = require_route("microservices")
+    u, err = require_route("Balancer")
     if err: return err
     data = request.get_json(silent=True) or {}
     action = (data.get("action") or "").strip()
@@ -3202,7 +3220,7 @@ def svc_orchestrate():
 
 @app.get("/api/svc/orchestrate/state")
 def svc_orchestrate_state():
-    _, err = require_route("microservices")
+    _, err = require_route("Balancer")
     if err: return err
     return jsonify(_orch_state())
 
@@ -3237,7 +3255,7 @@ def svc_rotation():
     body: {queries: [{service, hosts: [...]}]}
     Возвращает: {results: {service: {host_key: true(в ротации)|false(выведен)|null(не найден)}}}.
     """
-    _, err = require_route("microservices")
+    _, err = require_route("Balancer")
     if err: return err
     data = request.get_json(silent=True) or {}
     queries = data.get("queries") or []
@@ -3328,7 +3346,7 @@ def svc_rotation():
 
 @app.post("/api/svc/orchestrate/cancel")
 def svc_orchestrate_cancel():
-    u, err = require_route("microservices")
+    u, err = require_route("Balancer")
     if err: return err
     state = _orch_state()
     if not state.get("busy"):
@@ -3344,7 +3362,7 @@ def svc_orchestrate_cancel():
 
 @app.get("/api/svc/console")
 def svc_console_get():
-    _, err = require_route("microservices")
+    _, err = require_route("Balancer")
     if err: return err
     try:
         since_action = int(request.args.get("since_action") or 0)
