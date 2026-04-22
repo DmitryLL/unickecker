@@ -619,6 +619,15 @@
             flex-shrink: 0;
             display: inline-block;
         }
+        .node-rot-dot {
+            width: 9px; height: 9px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: inline-block;
+        }
+        .node-rot-dot.in      { background: #22c55e; box-shadow: 0 0 6px rgba(34, 197, 94, 0.55);  }
+        .node-rot-dot.partial { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.55); }
+        .node-rot-dot.out     { background: #ef4444; box-shadow: 0 0 7px rgba(239, 68, 68, 0.7);   }
         .nodes-card {
             margin-bottom: 12px;
             background: rgba(17, 24, 39, 0.55);
@@ -3424,7 +3433,11 @@
                 const rows = grp.hosts.map(h => {
                     const checked = _nodesCheckSel.has(h.name) ? 'checked' : '';
                     const safeKey = h.name.replace(/'/g, "\\'");
-                    const drained = _nodeHasDrain(h.name);
+                    const rot = _nodeRotState(h.name);
+                    const rotLabel = rot === 'in' ? 'Все сервисы в ротации'
+                                   : rot === 'out' ? 'Все балансируемые сервисы выведены из ротации'
+                                   : rot === 'partial' ? 'Часть сервисов выведена из ротации'
+                                   : '';
                     return `
                         <div class="svc-list-row">
                             <input type="checkbox" class="ms-checkbox"
@@ -3432,10 +3445,10 @@
                                    onclick="nodesToggle('${safeKey}', this.checked)">
                             <button type="button" class="svc-list-item"
                                     onclick="nodesToggle('${safeKey}', ${!_nodesCheckSel.has(h.name)})"
-                                    title="${escapeHtml(h.name)}${drained ? ' — есть сервисы вне ротации' : ''}">
+                                    title="${escapeHtml(h.name)}${rotLabel ? ' — ' + rotLabel : ''}">
                                 <span class="svc-list-text">
                                     <span class="svc-list-name">${escapeHtml(h.name)}</span>
-                                    ${drained ? '<span class="node-drain-dot" title="Есть сервисы вне ротации"></span>' : ''}
+                                    ${rot ? `<span class="node-rot-dot ${rot}" title="${rotLabel}"></span>` : ''}
                                 </span>
                             </button>
                         </div>`;
@@ -3626,6 +3639,32 @@
             return Object.values(byNode).some(v => v === false);
         }
 
+        function _nodeRotState(nodeKey) {
+            // 'in' — все балансируемые сервисы в ротации
+            // 'out' — все выведены
+            // 'partial' — смесь (или часть статусов неизвестна)
+            // null — нечего показывать (нет балансируемых сервисов / все unknown)
+            let node = null;
+            for (const grp of _allNodes()) {
+                const m = grp.hosts.find(h => h.name === nodeKey);
+                if (m) { node = m; break; }
+            }
+            if (!node) return null;
+            const balanced = (node.svcs || []).filter(s => !NOT_BALANCED_SVCS.has(s));
+            if (!balanced.length) return null;
+            const by = _nodesRotation[nodeKey] || {};
+            let inCount = 0, outCount = 0;
+            for (const s of balanced) {
+                const v = by[s];
+                if (v === true)  inCount++;
+                else if (v === false) outCount++;
+            }
+            if (outCount === balanced.length) return 'out';
+            if (inCount === balanced.length) return 'in';
+            if (outCount > 0 || inCount > 0) return 'partial';
+            return null;
+        }
+
         async function nodesRefresh() {
             await fetchNodesRotation();
             toast('Ротация обновлена', 'ok');
@@ -3728,6 +3767,7 @@
                 const cls = ['svc-list-row'];
                 if (s === _svcSelected) cls.push('active');
                 if (_svcHealth[s]) cls.push(_svcHealth[s]); // 'ok' | 'warn' | 'bad'
+                const drained = _svcHasDrain(s);
                 return `
                     <div class="${cls.join(' ')}">
                         <input type="checkbox" class="ms-checkbox"
@@ -3735,7 +3775,7 @@
                                ${allChecked ? 'checked' : ''}
                                onclick="event.stopPropagation(); toggleSvcAll('${safe}', this.checked)"
                                title="Выбрать все ноды этого сервиса">
-                        <button type="button" class="svc-list-item" onclick="selectSvcTab('${safe}')" title="${escapeHtml(s)}${NOT_BALANCED_SVCS.has(s) ? ' — не балансируется' : ''}">
+                        <button type="button" class="svc-list-item" onclick="selectSvcTab('${safe}')" title="${escapeHtml(s)}${NOT_BALANCED_SVCS.has(s) ? ' — не балансируется' : ''}${drained ? ' — есть ноды вне ротации' : ''}">
                             <span class="svc-list-text">
                                 <span class="svc-list-name">${escapeHtml(s)}</span>
                                 ${NOT_BALANCED_SVCS.has(s) ? `
@@ -3749,6 +3789,7 @@
                                         <line x1="3" y1="3" x2="21" y2="21" stroke="#ef4444" stroke-width="2.2"/>
                                     </svg>
                                 ` : ''}
+                                ${drained ? '<span class="node-drain-dot" title="Есть ноды вне ротации"></span>' : ''}
                             </span>
                         </button>
                     </div>`;
@@ -3870,7 +3911,7 @@
             btn.dataset.cooldown = '1';
             updateRefreshBtnState();
             try {
-                await fetchAllSvcHealth();
+                await Promise.all([fetchAllSvcHealth(), fetchAllSvcRotation()]);
                 if (_svcSelected) await fetchSvcStatuses();
             } catch {}
             setTimeout(() => {
@@ -4197,6 +4238,37 @@
             renderSvcSidebar();
         }
 
+        function _svcHasDrain(svc) {
+            const by = _svcRotation[svc];
+            if (!by) return false;
+            return Object.values(by).some(v => v === false);
+        }
+
+        async function fetchAllSvcRotation() {
+            // Ротация по всем балансируемым сервисам сразу — чтобы фиолетовый кружок
+            // появлялся в сайдбаре режима «Микросервисы» без выбора сервиса.
+            const services = Object.keys(_svcIndex || {}).filter(s => !NOT_BALANCED_SVCS.has(s));
+            if (!services.length) return;
+            const queries = services.map(svc => ({
+                service: svc,
+                hosts: (_svcIndex[svc] || []).map(h => h.host),
+            }));
+            try {
+                const r = await fetch('/api/svc/rotation', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({queries}),
+                });
+                if (!r.ok) return;
+                const d = await r.json();
+                const results = d.results || {};
+                for (const svc of Object.keys(results)) {
+                    _svcRotation[svc] = { ...(_svcRotation[svc] || {}), ...results[svc] };
+                }
+                renderSvcSidebar();
+            } catch {}
+        }
+
         async function fetchAllSvcHealth() {
             const services = Object.keys(_svcIndex || {});
             if (!services.length) return;
@@ -4229,6 +4301,7 @@
             _svcAllPollActive = true;
             // один опрос при заходе на страницу
             fetchAllSvcHealth();
+            fetchAllSvcRotation();
         }
         function stopSvcAllHealthPoll() {
             _svcAllPollActive = false;
