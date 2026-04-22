@@ -1749,7 +1749,9 @@ def _balancer_apply(client, sudo_pwd, path, host_keys, direction):
                 new_lines[i] = indent + "#" + stripped
                 modified.append(i + 1)
         else:  # return
-            m = re.match(r"^(\s*)#+\s*", line)
+            # Убираем только '#' (без съедания пробелов после них),
+            # чтобы сохранить исходное форматирование строки.
+            m = re.match(r"^(\s*)#+", line)
             if m:
                 new_lines[i] = m.group(1) + line[m.end():]
                 modified.append(i + 1)
