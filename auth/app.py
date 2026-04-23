@@ -3532,13 +3532,32 @@ def svc_orchestrate():
     if not ok:
         return jsonify({"error": "Уже идёт операция", "current": current}), 409
 
+    # Снимаем текущие максимумы id в svc_console ДО старта воркера —
+    # фронт использует это как «отсечку» UI-лога: всё, что с большим id,
+    # гарантированно относится к новому прогону.
+    try:
+        cur_max_action = db().execute(
+            "SELECT COALESCE(MAX(id), 0) FROM svc_console WHERE kind = 'action'"
+        ).fetchone()[0] or 0
+        cur_max_error = db().execute(
+            "SELECT COALESCE(MAX(id), 0) FROM svc_console WHERE kind = 'error'"
+        ).fetchone()[0] or 0
+    except Exception:
+        cur_max_action = 0
+        cur_max_error = 0
+
     t = threading.Thread(
         target=_orch_run,
         args=(action, pairs, balance_wait_sec, run_id, u["username"]),
         daemon=True,
     )
     t.start()
-    return jsonify({"ok": True, "run_id": run_id})
+    return jsonify({
+        "ok": True,
+        "run_id": run_id,
+        "log_cutoff_action": cur_max_action,
+        "log_cutoff_error":  cur_max_error,
+    })
 
 
 @app.get("/api/svc/orchestrate/state")

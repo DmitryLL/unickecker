@@ -3854,6 +3854,8 @@
                     toast(data.error || `Ошибка ${resp.status}`, 'err');
                     return;
                 }
+                const data = await resp.json().catch(() => ({}));
+                _resetSvcLogForNewRun(data.log_cutoff_action, data.log_cutoff_error);
                 fetchSvcRunState();
                 fetchSvcServerLog();
             } catch (e) {
@@ -3861,6 +3863,21 @@
             }
         }
         window.nodesAction = nodesAction;
+
+        // ===== Очистка UI-лога на старте нового прогона =====
+        // В БД (svc_console) все строки остаются; мы только перемещаем курсор
+        // опроса (_svcLogLastIds) и затираем DOM, чтобы на экране новый прогон
+        // начинался с чистого листа.
+        function _resetSvcLogForNewRun(cutoffAction, cutoffError) {
+            if (Number.isInteger(cutoffAction) && cutoffAction >= _svcLogLastIds.action) {
+                _svcLogLastIds.action = cutoffAction;
+            }
+            if (Number.isInteger(cutoffError) && cutoffError >= _svcLogLastIds.error) {
+                _svcLogLastIds.error = cutoffError;
+            }
+            document.querySelectorAll('.svc-log-actions, .svc-log-errors')
+                .forEach(el => { el.innerHTML = ''; });
+        }
 
         // ===== Balance wait (пауза после nginx reload) =====
         const BALANCE_WAIT_KEY = 'unichecker.balanceWaitSec';
@@ -4189,7 +4206,6 @@
                 return: 'Ввод в ротацию',
             }[s.action] || s.action;
             const cancelMark = s.cancel_requested ? ' <span style="color:#fde68a">(прерывание запрошено)</span>' : '';
-            const isAdmin = state.me?.role === 'admin';
             wrap.style.display = '';
             wrap.innerHTML = `
                 <div class="svc-run-banner">
@@ -4198,13 +4214,13 @@
                     ${canCancel && !s.cancel_requested
                         ? `<button type="button" class="svc-clear-btn" onclick="svcCancelRun()">Прервать</button>`
                         : ''}
-                    ${isAdmin
-                        ? `<button type="button" class="svc-tool-btn" onclick="svcForceUnlock()" title="Принудительно снять замок (для умершего воркера)">Снять замок</button>`
-                        : ''}
                 </div>`;
         }
 
         async function svcForceUnlock() {
+            // Кнопка «Снять замок» убрана из UI по запросу. Функция оставлена
+            // на случай вызова из консоли/скриптов; если она никому не нужна,
+            // удалить вместе с эндпоинтом /api/svc/orchestrate/force-unlock.
             const ok = await confirmModal({
                 title: 'Принудительно снять замок?',
                 message: 'Используйте только если оркестратор завис из-за умершего воркера. Если поток ещё жив — данные могут разойтись.',
@@ -4325,6 +4341,8 @@
                     toast(data.error || `Ошибка ${resp.status}`, 'err');
                     return;
                 }
+                const data = await resp.json().catch(() => ({}));
+                _resetSvcLogForNewRun(data.log_cutoff_action, data.log_cutoff_error);
                 // Сценарий запущен — поллинг подхватит state и лог
                 fetchSvcRunState();
                 fetchSvcServerLog();
