@@ -3189,8 +3189,9 @@ def _orch_sleep_with_cancel(seconds, run_id):
     return True
 
 
-def _orch_run(action, pairs, run_id, username):
-    """Главный поток. Никаких exception — всё в лог."""
+def _orch_run(action, pairs, balance_wait_sec, run_id, username):
+    """Главный поток. Никаких exception — всё в лог.
+    balance_wait_sec — пауза после nginx reload (drain/return)."""
     # Фоновый поток не имеет flask request/app-контекста; оборачиваем явно,
     # чтобы помощники типа get_balancer_creds() (использующие db()) работали.
     try:
@@ -3316,67 +3317,164 @@ def _orch_run(action, pairs, run_id, username):
                 return
 
             # ---- RESTART С БАЛАНСИРОВКОЙ ----
-            for gk in plecho_keys:
+            # Логика per-сервис, сервисы обрабатываются последовательно.
+            # Для балансируемого сервиса с 2+ плечами — плечо за плечом: drain всего
+            #   плеча → пауза → master (последовательно) → slaves (параллельно) →
+            #   return плеча → пауза.
+            # Для балансируемого сервиса с 1 плечом — нода за нодой: master, затем
+            #   каждый slave отдельно — (drain ноды → пауза → restart → return ноды →
+            #   пауза).
+            # Для не балансируемого сервиса — master последовательно, slaves
+            #   последовательно. Никаких nginx-правок.
+            services_order = []
+            services_by_name = {}
+            for gk, buckets in plechos.items():
+                for role_key, entries in (("master", buckets["master"]),
+                                          ("slaves", buckets["slaves"])):
+                    for e in entries:
+                        svc_name = e["service"]
+                        if svc_name not in services_by_name:
+                            services_by_name[svc_name] = {}
+                            services_order.append(svc_name)
+                        svc_plechos = services_by_name[svc_name]
+                        bucket = svc_plechos.setdefault(gk, {"master": [], "slaves": []})
+                        bucket[role_key].append(e)
+
+            for svc_name in services_order:
                 if _orch_is_cancelled(run_id): break
+                svc_plechos = services_by_name[svc_name]
+                is_balanced = bool(svc_paths.get(svc_name))
+                plechos_in_order = [g for g in plecho_keys if g in svc_plechos]
+
+                svc_log("action", "info",
+                        f"=== Сервис {svc_name} "
+                        f"({'балансируемый' if is_balanced else 'не балансируется'}, "
+                        f"плеч: {len(plechos_in_order)}) ===",
+                        run_id)
+
+                if not is_balanced:
+                    # Ветка: не балансируемый → просто мастер+слейвы sequential, без nginx
+                    for gk in plechos_in_order:
+                        if _orch_is_cancelled(run_id): break
+                        plecho = svc_plechos[gk]
+                        title = group_titles.get(gk, gk)
+                        for e in plecho["master"]:
+                            if _orch_is_cancelled(run_id): break
+                            if not _orch_restart_one(e, auth, run_id, title, "master"):
+                                svc_log("error", "err",
+                                        f"[{title}] master {e['host_key']} :: {e['service']} провалился, продолжаю",
+                                        run_id)
+                        for e in plecho["slaves"]:
+                            if _orch_is_cancelled(run_id): break
+                            if not _orch_restart_one(e, auth, run_id, title, "slave"):
+                                svc_log("error", "err",
+                                        f"[{title}] slave {e['host_key']} :: {e['service']} провалился, продолжаю",
+                                        run_id)
+                    continue
+
+                # Балансируемый
+                if len(plechos_in_order) >= 2:
+                    # 2+ плеча: плечо за плечом, drain всего плеча, master+slaves, return
+                    for gk in plechos_in_order:
+                        if _orch_is_cancelled(run_id): break
+                        plecho = svc_plechos[gk]
+                        title = group_titles.get(gk, gk)
+                        all_entries = plecho["master"] + plecho["slaves"]
+                        svc_log("action", "info", f"=== [{svc_name}] Плечо {title} ===", run_id)
+
+                        drained = _orch_apply_balancing(
+                            all_entries, svc_paths, ssh, sudo_pwd, run_id, title, "drain")
+                        if drained is None: return
+                        if _orch_is_cancelled(run_id): break
+                        if drained:
+                            svc_log("action", "info",
+                                    f"[{title}] жду {balance_wait_sec}с разбалансировки nginx", run_id)
+                            if not _orch_sleep_with_cancel(balance_wait_sec, run_id): break
+
+                        failed_entries = []
+                        # Master — последовательно (обычно один, но подстраховались)
+                        for e in plecho["master"]:
+                            if _orch_is_cancelled(run_id): break
+                            if not _orch_restart_one(e, auth, run_id, title, "master"):
+                                failed_entries.append((e["host_key"], e["service"]))
+                        if failed_entries:
+                            svc_log("error", "err",
+                                    f"[{title}] master не вернулся в Started — STOP плеча, ноды остались drained",
+                                    run_id)
+                            continue
+                        if _orch_is_cancelled(run_id): break
+
+                        # Slaves — параллельно
+                        if plecho["slaves"]:
+                            with ThreadPoolExecutor(max_workers=min(16, len(plecho["slaves"]))) as ex:
+                                futs = {ex.submit(_orch_restart_one, e, auth, run_id, title, "slave"): e
+                                        for e in plecho["slaves"]}
+                                for f, e in futs.items():
+                                    if not f.result():
+                                        failed_entries.append((e["host_key"], e["service"]))
+                            if failed_entries:
+                                bad = ", ".join(f"{hk}::{svc}" for hk, svc in failed_entries)
+                                svc_log("error", "err",
+                                        f"[{title}] не вернулись в Started: {bad} — не возвращаю в ротацию",
+                                        run_id)
+                        if _orch_is_cancelled(run_id): break
+
+                        failed_set = set(failed_entries)
+                        entries_to_return = [e for e in all_entries
+                                             if (e["host_key"], e["service"]) not in failed_set]
+                        returned = _orch_apply_balancing(
+                            entries_to_return, svc_paths, ssh, sudo_pwd, run_id, title, "return")
+                        if returned is None: return
+                        if _orch_is_cancelled(run_id): break
+                        if returned:
+                            svc_log("action", "info",
+                                    f"[{title}] жду {balance_wait_sec}с возврата балансировки", run_id)
+                            if not _orch_sleep_with_cancel(balance_wait_sec, run_id): break
+                    continue
+
+                # 1 плечо балансируемого: нода за нодой
+                gk = plechos_in_order[0]
+                plecho = svc_plechos[gk]
                 title = group_titles.get(gk, gk)
-                plecho = plechos[gk]
-                all_entries = plecho["master"] + plecho["slaves"]
-                svc_log("action", "info", f"=== Плечо {title} ===", run_id)
-
-                # 1) Drain
-                drained = _orch_apply_balancing(all_entries, svc_paths, ssh, sudo_pwd, run_id, title, "drain")
-                if drained is None: return
-                if _orch_is_cancelled(run_id): break
-
-                # 2) Sleep 60
-                if drained:
-                    svc_log("action", "info", f"[{title}] жду {INCEPTUM_BALANCE_WAIT}с разбалансировки nginx", run_id)
-                    if not _orch_sleep_with_cancel(INCEPTUM_BALANCE_WAIT, run_id): break
-
-                # 3) Master параллельно (по сервисам, если несколько на одной master-ноде)
-                failed_entries = []   # (host_key, service) — те, кого нельзя возвращать в ротацию
-                if plecho["master"]:
+                nodes_in_order = plecho["master"] + plecho["slaves"]
+                for e in nodes_in_order:
                     if _orch_is_cancelled(run_id): break
-                    with ThreadPoolExecutor(max_workers=min(8, len(plecho["master"]))) as ex:
-                        futs = {ex.submit(_orch_restart_one, e, auth, run_id, title, "master"): e
-                                for e in plecho["master"]}
-                        for f, e in futs.items():
-                            if not f.result():
-                                failed_entries.append((e["host_key"], e["service"]))
-                    if failed_entries:
+                    role_label = "master" if e in plecho["master"] else "slave"
+                    node_lbl = f"{e['host_key']} :: {e['service']}"
+                    svc_log("action", "info",
+                            f"=== [{svc_name}] {title} :: {role_label} {node_lbl} (1 плечо, нода за нодой) ===",
+                            run_id)
+
+                    # drain одной ноды
+                    drained = _orch_apply_balancing(
+                        [e], svc_paths, ssh, sudo_pwd, run_id, title, "drain")
+                    if drained is None: return
+                    if _orch_is_cancelled(run_id): break
+                    if drained:
+                        svc_log("action", "info",
+                                f"[{title}] жду {balance_wait_sec}с разбалансировки nginx", run_id)
+                        if not _orch_sleep_with_cancel(balance_wait_sec, run_id): break
+
+                    # restart
+                    ok_restart = _orch_restart_one(e, auth, run_id, title, role_label)
+                    if _orch_is_cancelled(run_id): break
+
+                    if not ok_restart:
                         svc_log("error", "err",
-                                f"[{title}] master не вернулся в Started, STOP плеча (ноды остались drained)",
+                                f"[{title}] {role_label} {node_lbl} не вернулся в Started — не возвращаю в ротацию, "
+                                "перехожу к следующей ноде",
                                 run_id)
-                        continue   # не делаем return — согласно ТЗ при падении master плечо стопится
-                if _orch_is_cancelled(run_id): break
+                        continue   # остаётся drained, трогаем следующую ноду
 
-                # 4) Slaves параллельно
-                if plecho["slaves"]:
-                    with ThreadPoolExecutor(max_workers=min(16, len(plecho["slaves"]))) as ex:
-                        futs = {ex.submit(_orch_restart_one, e, auth, run_id, title, "slave"): e
-                                for e in plecho["slaves"]}
-                        for f, e in futs.items():
-                            if not f.result():
-                                failed_entries.append((e["host_key"], e["service"]))
-                    if failed_entries:
-                        bad = ", ".join(f"{hk}::{svc}" for hk, svc in failed_entries)
-                        svc_log("error", "err",
-                                f"[{title}] не вернулись в Started: {bad} — не возвращаю их в ротацию",
-                                run_id)
-                if _orch_is_cancelled(run_id): break
-
-                # 5) Return — только тех, кто успешно рестартанул
-                failed_set = set(failed_entries)
-                entries_to_return = [e for e in all_entries
-                                     if (e["host_key"], e["service"]) not in failed_set]
-                returned = _orch_apply_balancing(entries_to_return, svc_paths, ssh, sudo_pwd, run_id, title, "return")
-                if returned is None: return
-                if _orch_is_cancelled(run_id): break
-
-                # 6) Sleep 60
-                if returned:
-                    svc_log("action", "info", f"[{title}] жду {INCEPTUM_BALANCE_WAIT}с возврата балансировки", run_id)
-                    if not _orch_sleep_with_cancel(INCEPTUM_BALANCE_WAIT, run_id): break
+                    # return
+                    returned = _orch_apply_balancing(
+                        [e], svc_paths, ssh, sudo_pwd, run_id, title, "return")
+                    if returned is None: return
+                    if _orch_is_cancelled(run_id): break
+                    if returned:
+                        svc_log("action", "info",
+                                f"[{title}] жду {balance_wait_sec}с возврата балансировки", run_id)
+                        if not _orch_sleep_with_cancel(balance_wait_sec, run_id): break
 
         finally:
             if ssh:
@@ -3410,6 +3508,14 @@ def svc_orchestrate():
     if not isinstance(nodes, list) or not nodes:
         return jsonify({"error": "Список nodes пуст"}), 400
 
+    # Пауза после reload nginx (drain/return). Клиент может переопределить,
+    # но клемимся на разумный диапазон.
+    try:
+        balance_wait_sec = int(data.get("balance_wait_sec") or 30)
+    except (TypeError, ValueError):
+        balance_wait_sec = 30
+    balance_wait_sec = max(1, min(balance_wait_sec, 999))
+
     pairs = []
     for n in nodes:
         if not isinstance(n, dict):
@@ -3426,7 +3532,11 @@ def svc_orchestrate():
     if not ok:
         return jsonify({"error": "Уже идёт операция", "current": current}), 409
 
-    t = threading.Thread(target=_orch_run, args=(action, pairs, run_id, u["username"]), daemon=True)
+    t = threading.Thread(
+        target=_orch_run,
+        args=(action, pairs, balance_wait_sec, run_id, u["username"]),
+        daemon=True,
+    )
     t.start()
     return jsonify({"ok": True, "run_id": run_id})
 

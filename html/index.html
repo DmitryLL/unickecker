@@ -731,6 +731,28 @@
         }
         .svc-controls-buttons { gap: 6px; }
         .svc-controls .ms-action-btn { padding: 4px 10px; font-size: 12px; }
+        .svc-balance-wait {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 11px; color: #9ca3af;
+            padding: 2px 8px;
+            border-left: 1px solid rgba(255, 255, 255, 0.08);
+            margin-left: 4px;
+        }
+        .svc-balance-wait input {
+            width: 44px;
+            padding: 2px 4px;
+            font-size: 12px;
+            color: #e5e7eb;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            font-family: inherit;
+            text-align: center;
+            -moz-appearance: textfield;
+        }
+        .svc-balance-wait input::-webkit-outer-spin-button,
+        .svc-balance-wait input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .svc-balance-wait input:focus { border-color: rgba(99, 102, 241, 0.5); outline: none; }
         .svc-controls-spacer { flex: 1; }
         .svc-controls-counter {
             font-size: 12px; color: #6b7280;
@@ -3324,6 +3346,11 @@
                                     <button type="button" class="ms-action-btn start"   id="svcStartBtn"      onclick="svcAction('start')">Включить микросервисы</button>
                                 </div>
                             </div>
+                            <label class="svc-balance-wait" title="Пауза после nginx reload (1–999 с)">
+                                Пауза nginx, с:
+                                <input type="number" min="1" max="999" id="svcBalanceWait"
+                                       oninput="onBalanceWaitInput(this)" onchange="onBalanceWaitChange(this)">
+                            </label>
                         </div>
                     </div>
                     <div class="svc-layout">
@@ -3371,6 +3398,11 @@
                         <div class="svc-controls-row svc-controls-buttons">
                             <button type="button" class="ms-action-btn stop"  id="nodesDrainBtn"  onclick="nodesAction('drain')">Вывести из ротации</button>
                             <button type="button" class="ms-action-btn start" id="nodesReturnBtn" onclick="nodesAction('return')">Ввести в ротацию</button>
+                            <label class="svc-balance-wait" title="Пауза после nginx reload (1–999 с)">
+                                Пауза nginx, с:
+                                <input type="number" min="1" max="999" id="nodesBalanceWait"
+                                       oninput="onBalanceWaitInput(this)" onchange="onBalanceWaitChange(this)">
+                            </label>
                         </div>
                     </div>
                     <div class="svc-layout">
@@ -3419,6 +3451,7 @@
                 fetchNodesRotation();
             }
             startSvcOrchPolling();
+            initBalanceWaitFields();
         }
         window.renderMicroservicesList = renderMicroservicesList;
 
@@ -3802,7 +3835,11 @@
                 const resp = await fetch('/api/svc/orchestrate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ action, nodes: items }),
+                    body: JSON.stringify({
+                        action,
+                        nodes: items,
+                        balance_wait_sec: _getBalanceWait(),
+                    }),
                 });
                 if (resp.status === 409) {
                     const data = await resp.json().catch(() => ({}));
@@ -3822,6 +3859,46 @@
             }
         }
         window.nodesAction = nodesAction;
+
+        // ===== Balance wait (пауза после nginx reload) =====
+        const BALANCE_WAIT_KEY = 'unichecker.balanceWaitSec';
+        const BALANCE_WAIT_DEFAULT = 30;
+        function _getBalanceWait() {
+            const raw = localStorage.getItem(BALANCE_WAIT_KEY);
+            const n = parseInt(raw, 10);
+            if (isNaN(n) || n < 1 || n > 999) return BALANCE_WAIT_DEFAULT;
+            return n;
+        }
+        function _setBalanceWait(n) {
+            const v = Math.max(1, Math.min(999, n | 0 || BALANCE_WAIT_DEFAULT));
+            localStorage.setItem(BALANCE_WAIT_KEY, String(v));
+            // Синхронизируем оба поля (на обеих вкладках)
+            for (const id of ['svcBalanceWait', 'nodesBalanceWait']) {
+                const el = document.getElementById(id);
+                if (el && document.activeElement !== el) el.value = String(v);
+            }
+            return v;
+        }
+        function onBalanceWaitInput(el) {
+            // Режем только цифры и ограничиваем 3 символами
+            el.value = String(el.value).replace(/\D+/g, '').slice(0, 3);
+        }
+        function onBalanceWaitChange(el) {
+            const n = parseInt(el.value, 10);
+            const v = isNaN(n) ? BALANCE_WAIT_DEFAULT : n;
+            _setBalanceWait(v);
+            el.value = String(_getBalanceWait());
+        }
+        function initBalanceWaitFields() {
+            const v = _getBalanceWait();
+            for (const id of ['svcBalanceWait', 'nodesBalanceWait']) {
+                const el = document.getElementById(id);
+                if (el) el.value = String(v);
+            }
+        }
+        window.onBalanceWaitInput  = onBalanceWaitInput;
+        window.onBalanceWaitChange = onBalanceWaitChange;
+        window.initBalanceWaitFields = initBalanceWaitFields;
 
         function renderSvcSidebar() {
             const all = Object.keys(_svcIndex).sort((a, b) => a.localeCompare(b));
@@ -4232,6 +4309,7 @@
                     body: JSON.stringify({
                         action,
                         nodes: items.map(i => ({host: i.host, service: i.service})),
+                        balance_wait_sec: _getBalanceWait(),
                     }),
                 });
                 if (resp.status === 409) {
