@@ -1445,6 +1445,14 @@
         .ms-action-btn.restart:hover { background: rgba(234, 179, 8, 0.15);   border-color: rgba(234, 179, 8, 0.4);   color: #fde68a; }
         .ms-action-btn.start:hover   { background: rgba(16, 185, 129, 0.15);  border-color: rgba(16, 185, 129, 0.4);  color: #6ee7b7; }
         .ms-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .ms-action-busy {
+            padding: 4px 10px;
+            font-size: 12px;
+            color: #fde68a;
+            background: rgba(234, 179, 8, 0.12);
+            border: 1px solid rgba(234, 179, 8, 0.35);
+            border-radius: 6px;
+        }
         .ms-sel-group {
             display: flex; align-items: center; gap: 6px;
             flex-wrap: wrap;
@@ -2935,6 +2943,11 @@
                 confirmClass: meta.cls,
             });
             if (!ok) return;
+            // Чистим DOM-лог, чтобы новый прогон начинался с пустого экрана.
+            // В БД svc_console ничего не удаляется; msConsoleLastId остаётся,
+            // поэтому следующий msConsoleLoad подхватит только НОВЫЕ записи.
+            msConsoleClear();
+            _msSetActionBusy(true, action);
             try {
                 const resp = await fetch('/api/ms/action', {
                     method: 'POST',
@@ -2943,15 +2956,55 @@
                 });
                 const data = await resp.json().catch(() => ({}));
                 if (!resp.ok) {
-                    msConsoleLogLocal('err', `POST /api/ms/action → ${resp.status}: ${data.error || 'нет ответа от сервера'}`);
+                    const fallback = resp.status === 502
+                        ? 'сервер не ответил за 300 с (операция могла пройти частично)'
+                        : 'нет ответа от сервера';
+                    msConsoleLogLocal('err', `POST /api/ms/action → ${resp.status}: ${data.error || fallback}`);
                 }
                 msConsoleLoad();
-                msPollStatuses();
+                // Серия опросов: Windows не сразу выставляет финальный статус.
+                // Первый прямо сейчас, потом +5, +15, +30 с.
+                _msSchedulePostActionPolls();
             } catch (e) {
                 msConsoleLogLocal('err', `POST /api/ms/action → сеть: ${e.message}`);
+                _msSchedulePostActionPolls();
+            } finally {
+                _msSetActionBusy(false, action);
             }
         }
         window.msAction = msAction;
+
+        // Индикатор «идёт операция» на вкладке «Службы»
+        function _msSetActionBusy(busy, action) {
+            const labels = { start: 'Запускаю…', stop: 'Останавливаю…', restart: 'Перезагружаю…' };
+            const btns = document.querySelectorAll('.ms-action-btn.start, .ms-action-btn.stop, .ms-action-btn.restart');
+            btns.forEach(b => { b.disabled = busy; });
+            let el = document.getElementById('msActionBusy');
+            if (busy) {
+                if (!el) {
+                    el = document.createElement('div');
+                    el.id = 'msActionBusy';
+                    el.className = 'ms-action-busy';
+                    const anchor = document.querySelector('.ms-actions') || btns[0]?.parentElement;
+                    if (anchor) anchor.appendChild(el);
+                }
+                el.textContent = `⏳ ${labels[action] || 'Выполняю…'}`;
+            } else if (el) {
+                el.remove();
+            }
+        }
+
+        // Серия пост-action опросов статусов: сразу + задержки.
+        let _msPostActionTimers = [];
+        function _msSchedulePostActionPolls() {
+            // Отменяем предыдущий план (если пользователь быстро-быстро кликнул).
+            _msPostActionTimers.forEach(t => clearTimeout(t));
+            _msPostActionTimers = [];
+            const delays = [0, 5000, 15000, 30000];   // мс
+            for (const d of delays) {
+                _msPostActionTimers.push(setTimeout(() => { msPollStatuses(); }, d));
+            }
+        }
 
         let _msEditingNode = null;   // редактируем существующую ноду
         let _msAddingGroup = null;   // создаём новую в указанной группе

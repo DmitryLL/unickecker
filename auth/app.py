@@ -2212,7 +2212,8 @@ def ms_status():
         host, service = configs[n]
         return _ms_query_status(host, service, user, pwd)
     if valid:
-        with ThreadPoolExecutor(max_workers=min(16, len(valid))) as ex:
+        # 32 потока — чтобы 30 нод проходили в одном батче, а не в двух
+        with ThreadPoolExecutor(max_workers=min(32, len(valid))) as ex:
             for n, st in zip(valid, ex.map(query, valid)):
                 statuses[n] = st
     return jsonify({"statuses": statuses})
@@ -2246,7 +2247,7 @@ def ms_action():
         return _ms_run_action(host, service, action, user, pwd)
     ok_nodes = []
     err_groups = {}
-    with ThreadPoolExecutor(max_workers=min(8, len(targeted))) as ex:
+    with ThreadPoolExecutor(max_workers=min(16, len(targeted))) as ex:
         for n, r in zip(targeted, ex.map(run, targeted)):
             results[n] = r
             if r.get("ok"):

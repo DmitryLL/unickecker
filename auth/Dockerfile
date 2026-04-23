@@ -15,4 +15,4 @@ COPY app.py .
 
 EXPOSE 5000
 
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "-w", "2", "--access-logfile", "-", "app:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "-w", "2", "-t", "300", "--access-logfile", "-", "app:app"]
