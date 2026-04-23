@@ -316,6 +316,14 @@ def init_db():
         )
     """)
     conn.execute("INSERT OR IGNORE INTO svc_run_lock (id) VALUES (1)")
+    # Миграция: поля отсечки UI-лога для текущего прогона
+    _lock_cols = {r[1] for r in conn.execute("PRAGMA table_info(svc_run_lock)").fetchall()}
+    for _c, _ddl in [
+        ("log_cutoff_action", "INTEGER NOT NULL DEFAULT 0"),
+        ("log_cutoff_error",  "INTEGER NOT NULL DEFAULT 0"),
+    ]:
+        if _c not in _lock_cols:
+            conn.execute(f"ALTER TABLE svc_run_lock ADD COLUMN {_c} {_ddl}")
 
     # Учётки для балансировки и Inceptum
     conn.execute("""
@@ -2792,7 +2800,9 @@ def svc_log(kind, level, message, run_id=None, username=None):
 
 
 def _orch_acquire(action, username):
-    """Взять глобальный замок. (ok, run_id, current_state_dict_if_busy)."""
+    """Взять глобальный замок. (ok, run_id, current_state_dict_if_busy).
+    При успехе также сохраняет в замке максимальные id svc_console (action/error),
+    чтобы все клиенты по этой отсечке почистили UI-лог при смене run_id."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     try:
@@ -2800,10 +2810,17 @@ def _orch_acquire(action, username):
         if row and row["run_id"]:
             return False, None, dict(row)
         run_id = str(uuid.uuid4())
+        cut_action = conn.execute(
+            "SELECT COALESCE(MAX(id), 0) FROM svc_console WHERE kind='action'"
+        ).fetchone()[0] or 0
+        cut_error = conn.execute(
+            "SELECT COALESCE(MAX(id), 0) FROM svc_console WHERE kind='error'"
+        ).fetchone()[0] or 0
         conn.execute(
             "UPDATE svc_run_lock SET run_id=?, username=?, action=?, "
-            "started_at=?, stopped_at=NULL, cancel_requested=0 WHERE id=1",
-            (run_id, username, action, int(time.time())),
+            "started_at=?, stopped_at=NULL, cancel_requested=0, "
+            "log_cutoff_action=?, log_cutoff_error=? WHERE id=1",
+            (run_id, username, action, int(time.time()), cut_action, cut_error),
         )
         conn.commit()
         return True, run_id, None
@@ -2837,6 +2854,8 @@ def _orch_state():
                 "action": row["action"],
                 "started_at": row["started_at"],
                 "cancel_requested": bool(row["cancel_requested"]),
+                "log_cutoff_action": row["log_cutoff_action"] or 0,
+                "log_cutoff_error":  row["log_cutoff_error"]  or 0,
             }
         return {"busy": False}
     finally:

@@ -3854,8 +3854,9 @@
                     toast(data.error || `Ошибка ${resp.status}`, 'err');
                     return;
                 }
-                const data = await resp.json().catch(() => ({}));
-                _resetSvcLogForNewRun(data.log_cutoff_action, data.log_cutoff_error);
+                // Чистим UI-лог не прямо здесь, а в fetchSvcRunState при
+                // первой же смене run_id — так сброс UI произойдёт у всех
+                // пользователей сразу, а не только у инициатора.
                 fetchSvcRunState();
                 fetchSvcServerLog();
             } catch (e) {
@@ -4140,11 +4141,20 @@
             }
         }
 
+        let _svcHandledRunId = null;
         async function fetchSvcRunState() {
             try {
                 const resp = await fetch('/api/svc/orchestrate/state');
                 if (!resp.ok) return;
                 _svcRunState = await resp.json();
+                // Смена run_id (или его появление) — признак старта нового прогона.
+                // Все клиенты, увидев новый run_id в /state, чистят UI-лог
+                // по общей для всех отсечке из сервера.
+                const s = _svcRunState;
+                if (s && s.busy && s.run_id && s.run_id !== _svcHandledRunId) {
+                    _resetSvcLogForNewRun(s.log_cutoff_action, s.log_cutoff_error);
+                    _svcHandledRunId = s.run_id;
+                }
                 renderSvcRunBanner();
                 refreshSvcControls();
                 updateRefreshBtnState();
@@ -4341,9 +4351,8 @@
                     toast(data.error || `Ошибка ${resp.status}`, 'err');
                     return;
                 }
-                const data = await resp.json().catch(() => ({}));
-                _resetSvcLogForNewRun(data.log_cutoff_action, data.log_cutoff_error);
-                // Сценарий запущен — поллинг подхватит state и лог
+                // Сценарий запущен — UI-лог у всех пользователей почистит
+                // fetchSvcRunState при ближайшей смене run_id (см. код ниже).
                 fetchSvcRunState();
                 fetchSvcServerLog();
             } catch (e) {
