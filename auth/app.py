@@ -1757,10 +1757,23 @@ def _balancer_apply(client, sudo_pwd, path, host_keys, direction):
                 modified.append(i + 1)
 
     if not modified:
-        return {"changed": False, "modified_lines": []}
+        return {"changed": False, "modified_lines": [], "original": content}
+
+    # Pre-flight: при drain убеждаемся, что в файле останется хотя бы одна
+    # активная строка 'server ...'. Иначе upstream окажется пустым и nginx
+    # свалится на reload с 'no servers are inside upstream'.
+    new_content = "\n".join(new_lines)
+    if direction == "drain":
+        server_active_re = re.compile(r"^\s*server\s+\S+", re.MULTILINE)
+        if not server_active_re.search(new_content):
+            raise BalancerError(
+                f"{path}: после drain все серверы окажутся закомментированы — "
+                "upstream будет пустым и nginx не примет reload "
+                "('no servers are inside upstream'). "
+                "Оставь хотя бы одну ноду в ротации."
+            )
 
     # Записываем через SFTP во временный файл и sudo cp
-    new_content = "\n".join(new_lines)
     tmp_path = f"/tmp/balancer_{int(time.time() * 1000)}_{os.getpid()}.tmp"
     sftp = client.open_sftp()
     try:
@@ -1781,7 +1794,7 @@ def _balancer_apply(client, sudo_pwd, path, host_keys, direction):
         pass
     if rc2 != 0:
         raise BalancerError(f"sudo cp в {path}: {(err2 or out2).strip()}")
-    return {"changed": True, "modified_lines": modified}
+    return {"changed": True, "modified_lines": modified, "original": content}
 
 
 # ===== Тестовый эндпойнт: проверка SSH-учётки + nginx -t =====
@@ -2981,6 +2994,44 @@ def _orch_group_pairs(pairs, nodes_map):
     return grouped
 
 
+def _orch_rollback_files(client, sudo_pwd, backups, run_id, plecho_title):
+    """Восстанавливает исходное содержимое файлов (path -> original text).
+    Вызывается при падении nginx -t / reload, либо при ошибке посреди drain/return,
+    чтобы не оставлять сломанный конфиг на диске."""
+    if not backups:
+        return
+    for path, original in backups.items():
+        try:
+            tmp_path = f"/tmp/balancer_rb_{int(time.time() * 1000)}_{os.getpid()}.tmp"
+            sftp = client.open_sftp()
+            try:
+                with sftp.file(tmp_path, "w") as fh:
+                    fh.write(original)
+                sftp.chmod(tmp_path, 0o644)
+            finally:
+                try: sftp.close()
+                except Exception: pass
+            rc, out, err = _ssh_run_sudo(
+                client, sudo_pwd, f"cp {shlex.quote(tmp_path)} {shlex.quote(path)}"
+            )
+            try: _ssh_run(client, f"rm -f {shlex.quote(tmp_path)}")
+            except Exception: pass
+            if rc == 0:
+                svc_log("action", "warn",
+                        f"[{plecho_title}] откат {path}: исходный конфиг восстановлен",
+                        run_id)
+            else:
+                svc_log("error", "err",
+                        f"[{plecho_title}] ОТКАТ {path} НЕ УДАЛСЯ: {(err or out).strip()}. "
+                        "Восстанови вручную, nginx reload сейчас ОПАСЕН.",
+                        run_id)
+        except Exception as e:
+            svc_log("error", "err",
+                    f"[{plecho_title}] исключение при откате {path}: {e}. "
+                    "Восстанови вручную, nginx reload сейчас ОПАСЕН.",
+                    run_id)
+
+
 def _orch_apply_balancing(entries, svc_paths, ssh, sudo_pwd, run_id, plecho_title, direction):
     """Drain или Return для всех (host, svc) этого плеча.
     Группирует по path (одна правка файла за всех нод сразу).
@@ -3002,6 +3053,7 @@ def _orch_apply_balancing(entries, svc_paths, ssh, sudo_pwd, run_id, plecho_titl
         for p in paths:
             path_to_keys.setdefault(p, set()).add(e["host_key"])
 
+    backups = {}   # path -> original content (для отката, если что-то упадёт)
     any_changed = False
     for path, keys_set in path_to_keys.items():
         keys = sorted(keys_set)
@@ -3009,9 +3061,11 @@ def _orch_apply_balancing(entries, svc_paths, ssh, sudo_pwd, run_id, plecho_titl
             res = _balancer_apply(ssh, sudo_pwd, path, keys, direction)
         except BalancerError as e:
             svc_log("error", "err", f"[{plecho_title}] {direction} {path}: {e}\nSTOP", run_id)
+            _orch_rollback_files(ssh, sudo_pwd, backups, run_id, plecho_title)
             return None
         if res["changed"]:
             any_changed = True
+            backups[path] = res["original"]
             svc_log("action", "ok",
                     f"[{plecho_title}] {direction} {path}: {len(res['modified_lines'])} стр. ({', '.join(keys)})",
                     run_id)
@@ -3025,7 +3079,9 @@ def _orch_apply_balancing(entries, svc_paths, ssh, sudo_pwd, run_id, plecho_titl
             _nginx_test(ssh, sudo_pwd)
             _nginx_reload(ssh, sudo_pwd)
         except BalancerError as e:
-            svc_log("error", "err", f"[{plecho_title}] {e}\nSTOP", run_id)
+            svc_log("error", "err", f"[{plecho_title}] {e}", run_id)
+            _orch_rollback_files(ssh, sudo_pwd, backups, run_id, plecho_title)
+            svc_log("error", "err", f"[{plecho_title}] STOP", run_id)
             return None
         svc_log("action", "ok", f"[{plecho_title}] nginx -t ok, reload ok", run_id)
     return any_changed
