@@ -3474,6 +3474,11 @@ def _orch_load_context(pairs):
        - svc_paths_int: {service_name: [paths]} — пути внутреннего балансера
        - svc_paths_ext: {service_name: [paths]} — пути внешнего балансера
        - groups:    [{key, title, position}] в порядке.
+       - svc_plecho_count: {service_name: int} — сколько плеч у сервиса
+         в каталоге всего (independent от того, сколько выбрано в прогон).
+         Используется для решения «параллельная per-плечо ветка vs нода
+         за нодой»: если у сервиса в каталоге 2+ плеча, дренить выбранное
+         плечо целиком безопасно — соседние держат трафик.
     """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -3497,15 +3502,27 @@ def _orch_load_context(pairs):
             ).fetchall()
             svc_paths_int = {r["name"]: json.loads(r["balancer_paths"]     or "[]") for r in rows}
             svc_paths_ext = {r["name"]: json.loads(r["balancer_paths_ext"] or "[]") for r in rows}
+            rows = conn.execute(
+                f"SELECT c.name AS name, COUNT(DISTINCT ns.group_key) AS cnt "
+                f"FROM ms_catalog c "
+                f"JOIN ms_catalog_nodes cn ON cn.catalog_id = c.id "
+                f"JOIN ms_node_settings ns ON ns.node_key = cn.node_key "
+                f"WHERE c.name IN ({ph2}) "
+                f"  AND ns.group_key IS NOT NULL AND ns.group_key != '' "
+                f"GROUP BY c.name",
+                svc_names,
+            ).fetchall()
+            svc_plecho_count = {r["name"]: r["cnt"] for r in rows}
         else:
             svc_paths_int = {}
             svc_paths_ext = {}
+            svc_plecho_count = {}
         groups = [dict(r) for r in conn.execute(
             "SELECT group_key, title, position FROM ms_groups ORDER BY position, group_key"
         ).fetchall()]
     finally:
         conn.close()
-    return nodes_map, svc_paths_int, svc_paths_ext, groups
+    return nodes_map, svc_paths_int, svc_paths_ext, groups, svc_plecho_count
 
 
 def _orch_group_pairs(pairs, nodes_map):
@@ -3792,7 +3809,7 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                         run_id, username)
                 return
 
-        nodes_map, svc_paths_int, svc_paths_ext, groups = _orch_load_context(pairs)
+        nodes_map, svc_paths_int, svc_paths_ext, groups, svc_plecho_count = _orch_load_context(pairs)
         plechos = _orch_group_pairs(pairs, nodes_map)
         if not plechos:
             svc_log("error", "err", "Нет валидных нод для обработки", run_id)
@@ -3945,16 +3962,23 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
 
             # ---- RESTART С БАЛАНСИРОВКОЙ ----
             # Логика per-сервис, сервисы обрабатываются последовательно.
-            # Для балансируемого сервиса с 2+ плечами — плечо за плечом целиком:
-            #   1) drain всего плеча (master + ВСЕ slaves одним апдейтом nginx) → пауза;
+            # Решающий фактор — сколько плеч у сервиса в КАТАЛОГЕ всего
+            # (svc_plecho_count), а не сколько выбрано в этот прогон. Если у
+            # сервиса 2+ плеча в каталоге — соседние плечи держат трафик, и
+            # дренить выбранные ноды одного плеча целиком безопасно.
+            # Для балансируемого сервиса с 2+ плечами в каталоге — плечо за
+            # плечом целиком (для каждого выбранного плеча):
+            #   1) drain всего плеча (master + ВСЕ выбранные slaves одним
+            #      апдейтом nginx) → пауза;
             #   2) restart master последовательно;
             #   3) restart slaves параллельно;
             #   4) return в ротацию ТОЛЬКО тех, кто поднялся в Started
             #      (упавшие — в лог ошибок, в ротацию НЕ возвращаются);
             #   → следующее плечо (даже если в этом кто-то не поднялся).
-            # Для балансируемого сервиса с 1 плечом — нода за нодой: master, затем
-            #   каждый slave отдельно — (drain ноды → пауза → restart → return ноды →
-            #   пауза).
+            # Для балансируемого сервиса с 1 плечом в каталоге — нода за
+            #   нодой: master, затем каждый slave отдельно — (drain ноды →
+            #   пауза → restart → return ноды → пауза). Дренить «всё разом»
+            #   нельзя — это полная остановка трафика.
             # Для не балансируемого сервиса — master последовательно, slaves
             #   последовательно. Никаких nginx-правок.
             services_order = []
@@ -3984,8 +4008,10 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                 elif has_ext:           bal_lbl = "балансируемый: внеш."
                 else:                   bal_lbl = "не балансируется"
 
+                total_plechos_in_catalog = svc_plecho_count.get(svc_name, 0)
                 svc_log("action", "info",
-                        f"=== Сервис {svc_name} ({bal_lbl}, плеч: {len(plechos_in_order)}) ===",
+                        f"=== Сервис {svc_name} ({bal_lbl}, плеч в каталоге: {total_plechos_in_catalog}, "
+                        f"в прогоне: {len(plechos_in_order)}) ===",
                         run_id)
 
                 if not is_balanced:
@@ -4016,13 +4042,14 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                 svc_paths_int_one = {svc_name: svc_paths_int.get(svc_name, [])}
                 svc_paths_ext_one = {svc_name: svc_paths_ext.get(svc_name, [])}
 
-                if len(plechos_in_order) >= 2:
-                    # 2+ плеча: плечо за плечом целиком.
-                    # Для каждого плеча: drain всего плеча → restart master →
-                    # restart slaves параллельно → return в ротацию только тех,
-                    # кто поднялся в Started. Упавшие ноды (master или slave)
-                    # — в лог ошибок, в ротацию не возвращаем, переходим к
-                    # следующему плечу.
+                if total_plechos_in_catalog >= 2:
+                    # У сервиса 2+ плеч в каталоге — соседние плечи держат
+                    # трафик, дренить выбранное плечо целиком безопасно.
+                    # Для каждого выбранного плеча: drain всего плеча →
+                    # restart master → restart slaves параллельно → return в
+                    # ротацию только тех, кто поднялся в Started. Упавшие ноды
+                    # (master или slave) — в лог ошибок, в ротацию не
+                    # возвращаем, переходим к следующему плечу.
                     for gk in plechos_in_order:
                         if _orch_is_cancelled(run_id): break
                         plecho = svc_plechos[gk]
@@ -4093,7 +4120,8 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                                 if not _orch_sleep_with_cancel(balance_wait_sec, run_id): break
                     continue
 
-                # 1 плечо балансируемого: нода за нодой
+                # У сервиса 1 плечо в каталоге — дренить пачкой нельзя,
+                # идём нодой за нодой по выбранному плечу.
                 gk = plechos_in_order[0]
                 plecho = svc_plechos[gk]
                 title = group_titles.get(gk, gk)
@@ -4103,7 +4131,8 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                     role_label = "master" if e in plecho["master"] else "slave"
                     node_lbl = f"{e['host_key']} :: {e['service']}"
                     svc_log("action", "info",
-                            f"=== [{svc_name}] {title} :: {role_label} {node_lbl} (1 плечо, нода за нодой) ===",
+                            f"=== [{svc_name}] {title} :: {role_label} {node_lbl} "
+                            f"(сервис с 1 плечом, нода за нодой) ===",
                             run_id)
 
                     # drain одной ноды
