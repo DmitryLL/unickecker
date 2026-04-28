@@ -3226,7 +3226,11 @@ INCEPTUM_HANG_WARN_SEC = 60      # через сколько начинаем п
 INCEPTUM_STOP_WAIT      = 90     # ждём Stopped после Stop, потом Kill
 INCEPTUM_KILL_WAIT      = 90     # ждём Stopped после Kill
 INCEPTUM_START_WAIT     = 90     # ждём Started после Start (на одну попытку)
-INCEPTUM_TIMEOUT_ACTION = 120    # HTTP read-timeout для POST Stop/Start/Kill
+INCEPTUM_TIMEOUT_ACTION = 10     # HTTP read-timeout для POST Stop/Start/Kill.
+                                 # Если ответа нет — _inceptum_post возвращает rc=-1,
+                                 # дальше код переходит в _inceptum_wait_status (опрос
+                                 # каждые 3с, cancel-aware). Короткий таймаут даёт
+                                 # быстрый отклик на «Прервать»: ≤10с вместо ≤120с.
 
 
 def svc_log(kind, level, message, run_id=None, username=None):
