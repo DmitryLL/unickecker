@@ -400,17 +400,38 @@
             grid-template-columns: 110px 1fr;
             gap: 8px;
             align-items: start;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             text-align: left;
+            min-width: 0;
+        }
+        .confirm-svc-subgroup.stacked {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
         .confirm-svc-subgroup:last-child { margin-bottom: 0; }
         .confirm-svc-subgroup-label {
             font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
             color: #6b7280; font-weight: 600;
             padding-top: 4px;
+            word-break: break-all;
+            min-width: 0;
+        }
+        .confirm-svc-subgroup.stacked .confirm-svc-subgroup-label {
+            font-size: 11px;
+            text-transform: none;
+            letter-spacing: 0;
+            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+            color: #cbd5e1;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 6px;
+            border-left: 3px solid rgba(99, 102, 241, 0.5);
+            font-weight: 500;
         }
         .confirm-svc-hosts {
-            display: flex; flex-wrap: wrap; gap: 4px;
+            display: flex; flex-wrap: wrap; gap: 6px;
+            min-width: 0;
         }
         .confirm-flag-row {
             display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
@@ -711,9 +732,10 @@
         }
         .nodes-svc-name .svc-no-balance-icon { width: 13px; height: 13px; flex-shrink: 0; }
         .nodes-svc-rot { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
-        .nodes-svc-rot.in    { color: #86efac; }
-        .nodes-svc-rot.out   { color: #fca5a5; }
-        .nodes-svc-rot.empty { color: #6b7280; }
+        .nodes-svc-rot.in      { color: #86efac; }
+        .nodes-svc-rot.out     { color: #fca5a5; }
+        .nodes-svc-rot.partial { color: #fde68a; }
+        .nodes-svc-rot.empty   { color: #6b7280; }
         .nodes-hint { color: #94a3b8; font-size: 12px; padding: 10px 6px; }
 
         .svc-controls {
@@ -798,7 +820,6 @@
         /* === Microservices: sidebar (services) + main (hosts) + console === */
         .svc-layout {
             display: flex; gap: 14px;
-            max-width: 1500px;
             align-items: stretch;
         }
         .svc-sidebar {
@@ -837,9 +858,20 @@
             user-select: none;
         }
         .svc-sidebar-list {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 3px 6px;
+            /* Multi-column: сначала забивается левая колонка целиком, потом
+               начинается правая. Алфавитный порядок (localeCompare на массиве)
+               совпадает с обычным top-to-bottom-then-next-column чтением. */
+            column-count: 2;
+            column-gap: 6px;
+        }
+        .svc-sidebar-list .svc-list-row {
+            /* Не даём строке разрезаться между колонками. */
+            break-inside: avoid;
+            margin-bottom: 3px;
+        }
+        /* На вкладке API сайдбар — одна колонка во всю ширину области. */
+        .svc-sidebar-list.single-col {
+            column-count: 1;
         }
         .svc-list-row {
             display: flex; align-items: center; gap: 8px;
@@ -1147,8 +1179,13 @@
             box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.32);
         }
         .svc-content {
-            flex: 0 0 470px;
-            min-width: 0;
+            /* Ширина по содержимому: не уже 470px (старый дефолт), но и не
+               растягиваем до края экрана. Если у сервиса N nginx-файлов —
+               таблица станет ровно той ширины, что нужно её колонкам. */
+            flex: 0 0 auto;
+            min-width: 470px;
+            width: fit-content;
+            max-width: 100%;
             background: rgba(17, 24, 39, 0.4);
             border: 1px solid rgba(255, 255, 255, 0.04);
             border-radius: 12px;
@@ -1156,8 +1193,12 @@
             align-self: flex-start;
         }
         .svc-console-box {
-            flex: 0 0 380px;
-            min-width: 280px;
+            /* Лог занимает остаток справа после таблицы, но не уже 320px и
+               не шире 520px — чтобы оставаться читаемым и не растягиваться
+               на половину экрана. */
+            flex: 1 1 380px;
+            min-width: 320px;
+            max-width: 520px;
             display: flex; flex-direction: column;
             background: #0a0f1d;
             border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1217,7 +1258,8 @@
         .stunnel-status .label .state {
             font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
         }
-        .stunnel-status .label .host { color: #6b7280; font-family: ui-monospace, monospace; font-size: 11px; }
+        .stunnel-status .label .host { color: #f3f4f6; font-family: ui-monospace, monospace; font-size: 11px; }
+        .stunnel-card-title { font-size: 13px; font-weight: 600; color: #c7d2fe; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
         .stunnel-status.active   .dot { background: #10b981; }
         .stunnel-status.active   .state { color: #6ee7b7; }
         .stunnel-status.inactive .dot { background: #ef4444; }
@@ -1305,17 +1347,40 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.06);
             margin-bottom: 4px;
         }
+        .svc-host-header.dual,
+        .svc-host-pill.dual { grid-template-columns: 22px 105px 70px 56px 56px 110px; }
         .svc-host-header .col-version,
         .svc-host-header .col-rotation,
         .svc-host-header .col-status { text-align: center; }
+        .svc-host-header .col-rotation {
+            /* В режиме «колонка-на-файл» заголовок может быть длинным
+               (basename вида prod.operations.api.unistream.com) — даём перенос
+               и обрезаем, чтобы не наезжало на соседнюю колонку. */
+            white-space: normal;
+            word-break: break-all;
+            overflow-wrap: anywhere;
+            line-height: 1.15;
+            overflow: hidden;
+        }
+        .svc-host-header .col-rotation.file {
+            /* Заголовок-имя файла: мельче шрифт и без uppercase,
+               чтобы помещалось в 2-3 строки. */
+            text-transform: none;
+            letter-spacing: 0;
+            font-size: 9px;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+        .svc-host-header { align-items: end; }
         .svc-host-pill .svc-host-rotation {
             font-size: 12px;
             text-align: center;
             font-weight: 600;
         }
-        .svc-host-pill .svc-host-rotation.in   { color: #6ee7b7; }
-        .svc-host-pill .svc-host-rotation.out  { color: #fca5a5; }
-        .svc-host-pill .svc-host-rotation.empty { color: #6b7280; font-weight: 400; }
+        .svc-host-pill .svc-host-rotation.in      { color: #6ee7b7; }
+        .svc-host-pill .svc-host-rotation.out     { color: #fca5a5; }
+        .svc-host-pill .svc-host-rotation.partial { color: #fde68a; }
+        .svc-host-pill .svc-host-rotation.empty   { color: #6b7280; font-weight: 400; }
         .svc-host-pill {
             display: grid;
             grid-template-columns: 22px 105px 70px 70px 110px;
@@ -1328,6 +1393,9 @@
             color: #f3f4f6;
             font-size: 13px;
             font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        }
+        .nodes-svc-rot-cells {
+            display: inline-flex; gap: 8px; align-items: center; justify-content: flex-end;
         }
         .svc-host-pill > span:nth-child(2),
         .svc-host-pill > .svc-host-link {
@@ -1987,12 +2055,62 @@
                 <div id="nodesCatalogArea"><div class="muted">Загрузка…</div></div>
             </section>
 
+            <!-- API SETTINGS (admin) -->
+            <section data-route="api_settings">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Настройка API</h1>
+                        <div class="page-sub">Балансировка по nginx-конфигам внешнего балансировщика. Один файл — одна запись.</div>
+                        <button type="button" class="btn btn-primary" onclick="openApiEntryEditor(null)" style="margin-top:12px">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Добавить
+                        </button>
+                    </div>
+                </div>
+                <div id="apiSettingsArea"><div class="muted">Загрузка…</div></div>
+            </section>
+
+            <!-- API ENTRY EDITOR MODAL -->
+            <div class="modal-backdrop" id="apiEntryBackdrop" onclick="if(event.target===this) closeApiEntryEditor()">
+                <div class="modal" style="max-width: 640px">
+                    <div class="modal-title" id="apiEntryTitle">Новая запись</div>
+                    <div class="modal-sub">Имя записи, путь к nginx-конфигу на внешнем балансировщике и список ключей поиска (по одному на строку)</div>
+                    <form id="apiEntryForm" onsubmit="return saveApiEntry(event)">
+                        <div class="field">
+                            <label for="apiEntryName">Имя записи</label>
+                            <input type="text" id="apiEntryName" autocomplete="off" spellcheck="false" required maxlength="128">
+                            <div class="field-hint">Любые буквы/цифры/пробелы, точка, дефис, подчёркивание (до 128 символов)</div>
+                        </div>
+                        <div class="field">
+                            <label for="apiEntryPath">Путь nginx-конфига</label>
+                            <input type="text" id="apiEntryPath" autocomplete="off" spellcheck="false" required
+                                   style="font-family:ui-monospace,monospace;font-size:12px"
+                                   placeholder="/etc/nginx/conf.d/api.example.conf">
+                            <div class="field-hint">Полный путь, начинается со «/». Применяется на внешнем nginx.</div>
+                        </div>
+                        <div class="field">
+                            <label>Ключи поиска по плечам (по одному на строку)</label>
+                            <div id="apiEntryKeysGroups" style="display:flex;flex-direction:column;gap:10px"></div>
+                            <div class="field-hint">Используются для drain/return: ищется word-boundary в первых 35 строках файла. Латиница/цифры, точка, дефис, подчёркивание (до 64 символов на ключ).</div>
+                        </div>
+                        <div class="modal-error" id="apiEntryError"></div>
+                        <div class="modal-actions" style="justify-content: space-between">
+                            <button type="button" class="btn btn-danger" id="apiEntryDeleteBtn" onclick="deleteApiEntry()" style="display:none">Удалить</button>
+                            <div style="display:flex;gap:8px;margin-left:auto">
+                                <button type="button" class="btn btn-ghost" onclick="closeApiEntryEditor()">Отмена</button>
+                                <button type="submit" class="btn btn-primary" id="apiEntrySubmitBtn">Сохранить</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <!-- CREDENTIALS -->
             <section data-route="balancer_creds">
                 <div class="page-header">
                     <div>
                         <h1 class="page-title">Учётки</h1>
-                        <div class="page-sub">SSH к балансировщику nginx, NTLM для Inceptum API, SSH к stunnel-серверу</div>
+                        <div class="page-sub">SSH к внутреннему и внешнему nginx-балансировщикам, NTLM для Inceptum API, SSH к stunnel-серверам (SBP и BRS)</div>
                     </div>
                 </div>
                 <div id="balancerCredsArea"><div class="muted">Загрузка…</div></div>
@@ -2094,11 +2212,30 @@
                     <div class="field-hint">Латиница, цифры, точка, дефис, подчёркивание (до 128 символов)</div>
                 </div>
                 <div class="field">
-                    <label for="msCatPaths">Пути nginx-конфигов балансировщика (по одному на строку)</label>
-                    <textarea id="msCatPaths" rows="3" autocomplete="off" spellcheck="false"
-                              style="width:100%;padding:10px 12px;font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,255,255,0.04);color:#f3f4f6;border:1px solid rgba(255,255,255,0.1);border-radius:9px;outline:none;resize:vertical"
-                              placeholder="/etc/nginx/conf.d/prod.example.conf"></textarea>
-                    <div class="field-hint">Пусто — сервис не балансируется. По одному пути на строку. Допустимы /, латиница, цифры, точка, дефис, подчёркивание.</div>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+                        <input type="checkbox" id="msCatBalInt" onchange="msCatToggleBalGroup('Int')" style="width:14px;height:14px;cursor:pointer">
+                        <span>Балансировать на <strong>внутреннем</strong> nginx</span>
+                    </label>
+                    <div id="msCatPathsIntWrap" style="display:none;margin-top:8px">
+                        <label for="msCatPaths" style="font-size:11px;color:#9ca3af">Пути конфигов внутреннего nginx (по одному на строку)</label>
+                        <textarea id="msCatPaths" rows="3" autocomplete="off" spellcheck="false"
+                                  style="width:100%;padding:10px 12px;font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,255,255,0.04);color:#f3f4f6;border:1px solid rgba(255,255,255,0.1);border-radius:9px;outline:none;resize:vertical"
+                                  placeholder="/etc/nginx/conf.d/prod.example.conf"></textarea>
+                        <div class="field-hint">По одному пути на строку. Допустимы /, латиница, цифры, точка, дефис, подчёркивание.</div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+                        <input type="checkbox" id="msCatBalExt" onchange="msCatToggleBalGroup('Ext')" style="width:14px;height:14px;cursor:pointer">
+                        <span>Балансировать на <strong>внешнем</strong> nginx</span>
+                    </label>
+                    <div id="msCatPathsExtWrap" style="display:none;margin-top:8px">
+                        <label for="msCatPathsExt" style="font-size:11px;color:#9ca3af">Пути конфигов внешнего nginx (по одному на строку)</label>
+                        <textarea id="msCatPathsExt" rows="3" autocomplete="off" spellcheck="false"
+                                  style="width:100%;padding:10px 12px;font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,255,255,0.04);color:#f3f4f6;border:1px solid rgba(255,255,255,0.1);border-radius:9px;outline:none;resize:vertical"
+                                  placeholder="/etc/nginx/conf.d/ext.example.conf"></textarea>
+                        <div class="field-hint">Заполняется только если сервис задействован и на внешнем балансере.</div>
+                    </div>
                 </div>
                 <div class="field">
                     <label>Ноды, на которых запускается сервис</label>
@@ -2193,6 +2330,7 @@
             db_connection: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></svg>',
             ms_catalog:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M4 14h6v6H4z"/><path d="M14 14h6v6h-6z"/></svg>',
             nodes_catalog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><circle cx="7" cy="7" r="0.6" fill="currentColor"/><circle cx="7" cy="17" r="0.6" fill="currentColor"/></svg>',
+            api_settings:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
             balancer_creds:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4"/><path d="M18 5l4 4"/><path d="M15 8l4 4"/></svg>',
             stunnel:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z"/><path d="M9 12l2 2 4-4"/></svg>',
             about:         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
@@ -2225,19 +2363,25 @@
                 }
                 const nodesEl = document.getElementById('confirmNodes');
                 if (groups && groups.length) {
+                    // Длинные лейблы (например, путь nginx-конфига) разворачиваем
+                    // вертикально, иначе короткая колонка-метка обрезает текст,
+                    // и пилюли наезжают на label.
+                    const STACK_LABEL_LEN = 28;
                     nodesEl.innerHTML = groups.map(g => {
                         const total = g.total ?? (g.subgroups
                             ? g.subgroups.reduce((a, sg) => a + sg.hosts.length, 0)
                             : (g.items?.length || 0));
                         const body = g.subgroups
-                            ? g.subgroups.map(sg => `
-                                <div class="confirm-svc-subgroup">
+                            ? g.subgroups.map(sg => {
+                                const stacked = (sg.label || '').length > STACK_LABEL_LEN;
+                                return `
+                                <div class="confirm-svc-subgroup${stacked ? ' stacked' : ''}">
                                     <span class="confirm-svc-subgroup-label">${escapeHtml(sg.label)}</span>
                                     <div class="confirm-svc-hosts">
                                         ${sg.hosts.map(h => `<span class="confirm-node-pill">${escapeHtml(h)}</span>`).join('')}
                                     </div>
-                                </div>
-                            `).join('')
+                                </div>`;
+                            }).join('')
                             : `<div class="confirm-svc-hosts">${(g.items || []).map(it => `<span class="confirm-node-pill">${escapeHtml(it)}</span>`).join('')}</div>`;
                         return `
                             <div class="confirm-svc-group">
@@ -2383,6 +2527,7 @@
             if (route === 'db_connection') loadDbSettings();
             if (route === 'ms_catalog') loadMsCatalog();
             if (route === 'nodes_catalog') loadNodesCatalog();
+            if (route === 'api_settings') loadApiSettings();
             if (route === 'balancer_creds') loadBalancerCreds();
             if (route === 'stunnel') { loadStunnel(); startStunnelPolling(); } else stopStunnelPolling();
             if (route === 'about') loadAbout(); else cancelAboutEdit({ silent: true });
@@ -3323,7 +3468,8 @@
         let _svcFilter = '';
         let _svcStatuses = {};      // {hostKey: state} — для текущего открытого сервиса
         let _svcVersions = {};      // {hostKey: 'x.y.z'}
-        let _svcRotation = {};      // {service: {hostKey: bool}} — true=в ротации, false=выведен; undefined=неизвестно
+        let _svcRotation = {};      // {service: {hostKey: {int: {path: bool|null}, ext: {path: bool|null}}}}
+        let _svcPathsBySvc = {};    // {service: {int: [path,...], ext: [path,...]}} — для колонок «по файлам»
         let _svcHealth = {};        // {service: 'ok'|'bad'} — health-индикатор в сайдбаре
         let _svcAllPollActive = false;
         let _svcPollTimer = null;
@@ -3376,11 +3522,21 @@
             if (!_svcIndex) _svcIndex = buildServiceIndex();
             // Не выбираем сервис автоматически — пользователь выбирает сам.
             if (_svcSelected && !_svcIndex[_svcSelected]) _svcSelected = null;
+            // DOM лога будет пересоздан ниже — сбрасываем курсор и флаги, чтобы
+            // первый poll /state снова поднял `log_cutoff_*` из БД, а следующий
+            // /console подтянул весь лог последнего/текущего прогона. Без этого
+            // при переходе на другую страницу и обратно лог оставался пустым,
+            // потому что курсор уже стоял на «последнем виденном id», а DOM —
+            // свежий и пустой.
+            _svcLogLastIds = { action: 0, error: 0 };
+            _svcInitialCutoffApplied = false;
+            _svcHandledRunId = null;
             root.innerHTML = `
                 <div id="svcRunBanner" style="display:none"></div>
                 <div class="bal-mode-tabs">
                     <button type="button" class="bal-mode-tab ${_balMode === 'services' ? 'active' : ''}" onclick="setBalMode('services')">Микросервисы</button>
                     <button type="button" class="bal-mode-tab ${_balMode === 'nodes' ? 'active' : ''}" onclick="setBalMode('nodes')">Ноды</button>
+                    <button type="button" class="bal-mode-tab ${_balMode === 'api' ? 'active' : ''}" onclick="setBalMode('api')">API</button>
                 </div>
                 <div id="svcModeServices" style="${_balMode === 'services' ? '' : 'display:none'}">
                     <div class="svc-controls">
@@ -3489,6 +3645,41 @@
                         </div>
                     </div>
                 </div>
+                <div id="svcModeApi" style="${_balMode === 'api' ? '' : 'display:none'}">
+                    <div class="svc-controls">
+                        <div class="svc-controls-row svc-controls-buttons">
+                            <button type="button" class="ms-action-btn stop"  id="apiDrainBtn"  onclick="apiAction('drain')">Вывести из ротации</button>
+                            <button type="button" class="ms-action-btn start" id="apiReturnBtn" onclick="apiAction('return')">Ввести в ротацию</button>
+                        </div>
+                    </div>
+                    <div class="svc-layout">
+                        <div class="svc-sidebar">
+                            <div class="svc-sidebar-head">
+                                <label class="svc-sidebar-selectall">
+                                    <input type="checkbox" class="ms-checkbox" id="apiSelectAllCb" onchange="apiSelectAll(this.checked)">
+                                    <span>Выделить все</span>
+                                </label>
+                                <button type="button" class="svc-tool-btn" onclick="apiRefresh()" title="Опросить ротацию по всем записям">⟳ Обновить ротацию</button>
+                            </div>
+                            <div class="svc-sidebar-list single-col" id="apiList"></div>
+                        </div>
+                        <div class="svc-content" id="apiContent"></div>
+                        <div class="svc-console-box">
+                            <div class="svc-console-half">
+                                <div class="ms-console-header">
+                                    <span class="ms-console-title">Лог действий</span>
+                                </div>
+                                <div class="ms-console svc-log-actions" id="apiConsole"></div>
+                            </div>
+                            <div class="svc-console-half svc-console-errors-half">
+                                <div class="ms-console-header">
+                                    <span class="ms-console-title" style="color:#fca5a5">Лог ошибок</span>
+                                </div>
+                                <div class="ms-console svc-log-errors" id="apiConsoleErrors"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             `;
             if (_balMode === 'services') {
                 renderSvcSidebar();
@@ -3497,13 +3688,17 @@
                 if (_svcSelected) startSvcPolling();
                 else stopSvcPolling();
                 startSvcAllHealthPoll();
-            } else {
+            } else if (_balMode === 'nodes') {
                 renderNodesSidebar();
                 renderNodesContent();
                 refreshNodesControls();
                 stopSvcPolling();
                 stopSvcAllHealthPoll();
                 fetchNodesRotation();
+            } else if (_balMode === 'api') {
+                stopSvcPolling();
+                stopSvcAllHealthPoll();
+                loadApiBalancerEntries();
             }
             startSvcOrchPolling();
             initBalanceWaitFields();
@@ -3525,30 +3720,34 @@
         });
 
         // ============ РЕЖИМ-ПЕРЕКЛЮЧАТЕЛЬ ============
-        let _balMode = 'services';   // 'services' | 'nodes'
+        let _balMode = 'services';   // 'services' | 'nodes' | 'api'
         function setBalMode(mode) {
-            if (mode !== 'services' && mode !== 'nodes') return;
+            if (!['services', 'nodes', 'api'].includes(mode)) return;
             if (_balMode === mode) return;
             _balMode = mode;
-            // Не перерисовываем всё дерево (иначе лог обнулится) — просто переключаем display и
-            // подстраиваем поллинги.
             const svcEl  = document.getElementById('svcModeServices');
             const nodeEl = document.getElementById('svcModeNodes');
+            const apiEl  = document.getElementById('svcModeApi');
             if (svcEl)  svcEl.style.display  = mode === 'services' ? '' : 'none';
             if (nodeEl) nodeEl.style.display = mode === 'nodes'    ? '' : 'none';
+            if (apiEl)  apiEl.style.display  = mode === 'api'      ? '' : 'none';
             document.querySelectorAll('.bal-mode-tab').forEach(b => b.classList.remove('active'));
             const activeBtn = document.querySelector(`.bal-mode-tab[onclick="setBalMode('${mode}')"]`);
             if (activeBtn) activeBtn.classList.add('active');
             if (mode === 'services') {
                 if (_svcSelected) startSvcPolling();
                 startSvcAllHealthPoll();
-            } else {
+            } else if (mode === 'nodes') {
                 stopSvcPolling();
                 stopSvcAllHealthPoll();
                 renderNodesSidebar();
                 renderNodesContent();
                 refreshNodesControls();
                 fetchNodesRotation();
+            } else if (mode === 'api') {
+                stopSvcPolling();
+                stopSvcAllHealthPoll();
+                loadApiBalancerEntries();
             }
         }
         window.setBalMode = setBalMode;
@@ -3698,14 +3897,59 @@
             if (retrn) retrn.disabled = (n === 0);
         }
 
+        // Сводит словарь {path: bool|null} к одному значению true/false/'mixed'/null.
+        function _rotPathsAggregate(byPath) {
+            if (byPath == null) return null;
+            // Совместимость со старым форматом: вдруг прилетел bool.
+            if (typeof byPath === 'boolean') return byPath;
+            if (typeof byPath !== 'object') return null;
+            const vals = Object.values(byPath).filter(v => v !== null);
+            if (!vals.length) return null;
+            if (vals.every(v => v === true))  return true;
+            if (vals.every(v => v === false)) return false;
+            return 'mixed';
+        }
+
+        // Конвертирует значение из API ротации в массив ячеек для левой панели
+        // (одна-две ячейки: «внутр.»/«внеш.» в агрегированном виде).
+        // Поддерживает legacy-bool (на случай старых данных в кеше) и новую
+        // структуру {int: {path: bool|null}, ext: {path: bool|null}}.
+        function _rotCells(rotVal) {
+            if (rotVal == null) return [{cls: 'empty', text: '—', hint: ''}];
+            if (typeof rotVal === 'boolean') {
+                return [{cls: rotVal ? 'in' : 'out', text: rotVal ? 'ДА' : 'НЕТ', hint: ''}];
+            }
+            const cells = [];
+            const ri = _rotPathsAggregate(rotVal.int);
+            const re = _rotPathsAggregate(rotVal.ext);
+            const mk = (v, hint) => {
+                if (v === 'mixed') return {cls: 'partial', text: 'смесь', hint};
+                if (v === true)    return {cls: 'in',      text: 'ДА',    hint};
+                if (v === false)   return {cls: 'out',     text: 'НЕТ',   hint};
+                return null;
+            };
+            const ci = mk(ri, 'Внутренний балансировщик');
+            const ce = mk(re, 'Внешний балансировщик');
+            if (ci) cells.push(ci);
+            if (ce) cells.push(ce);
+            return cells.length ? cells : [{cls: 'empty', text: '—', hint: ''}];
+        }
+
+        // Сводный статус для одного значения: true (всё в ротации), false (всё выведено),
+        // 'mixed' (часть туда, часть сюда), null (нет данных).
+        function _rotSummary(rotVal) {
+            const cells = _rotCells(rotVal).filter(c => c.cls !== 'empty');
+            if (!cells.length) return null;
+            if (cells.every(c => c.cls === 'in'))  return true;
+            if (cells.every(c => c.cls === 'out')) return false;
+            return 'mixed';
+        }
+
         function _nodeRotCell(nodeKey, svc) {
             if (NOT_BALANCED_SVCS.has(svc)) {
-                return { cls: 'empty', text: '' };
+                return [{cls: 'empty', text: '', hint: ''}];
             }
-            const r = _nodesRotation[nodeKey]?.[svc];
-            if (r === true)  return { cls: 'in',  text: 'ДА' };
-            if (r === false) return { cls: 'out', text: 'НЕТ' };
-            return { cls: 'empty', text: '—' };
+            return _rotCells(_nodesRotation[nodeKey]?.[svc]);
         }
 
         const _NOT_BALANCED_SVG = `
@@ -3737,12 +3981,15 @@
                 const svcs = n.svcs.slice().sort((a, b) => a.localeCompare(b));
                 const rows = svcs.length
                     ? svcs.map(s => {
-                        const cell = _nodeRotCell(n.name, s);
+                        const cells = _nodeRotCell(n.name, s);
                         const notBal = NOT_BALANCED_SVCS.has(s);
+                        const cellsHtml = cells.map(c =>
+                            `<span class="nodes-svc-rot ${c.cls}"${c.hint ? ` title="${c.hint}"` : ''}>${c.text}</span>`
+                        ).join('');
                         return `
                             <div class="nodes-svc-row${notBal ? ' muted' : ''}">
                                 <span class="nodes-svc-name">${escapeHtml(s)}${notBal ? _NOT_BALANCED_SVG : ''}</span>
-                                <span class="nodes-svc-rot ${cell.cls}">${cell.text}</span>
+                                <span class="nodes-svc-rot-cells">${cellsHtml}</span>
                             </div>`;
                       }).join('')
                     : '<div class="nodes-hint">На этой ноде нет привязанных микросервисов.</div>';
@@ -3785,6 +4032,7 @@
                         (_nodesRotation[nodeKey] ??= {})[svc] = val;
                     }
                 }
+                Object.assign(_svcPathsBySvc, d.paths_by_svc || {});
                 renderNodesSidebar();
                 renderNodesContent();
             } catch {}
@@ -3793,7 +4041,10 @@
         function _nodeHasDrain(nodeKey) {
             const byNode = _nodesRotation[nodeKey];
             if (!byNode) return false;
-            return Object.values(byNode).some(v => v === false);
+            return Object.values(byNode).some(v => {
+                const s = _rotSummary(v);
+                return s === false || s === 'mixed';
+            });
         }
 
         function _nodeRotState(nodeKey) {
@@ -3810,12 +4061,14 @@
             const balanced = (node.svcs || []).filter(s => !NOT_BALANCED_SVCS.has(s));
             if (!balanced.length) return null;
             const by = _nodesRotation[nodeKey] || {};
-            let inCount = 0, outCount = 0;
+            let inCount = 0, outCount = 0, mixedCount = 0;
             for (const s of balanced) {
-                const v = by[s];
-                if (v === true)  inCount++;
-                else if (v === false) outCount++;
+                const summary = _rotSummary(by[s]);
+                if (summary === true)  inCount++;
+                else if (summary === false) outCount++;
+                else if (summary === 'mixed') mixedCount++;
             }
+            if (mixedCount > 0) return 'partial';
             if (outCount === balanced.length) return 'out';
             if (inCount === balanced.length) return 'in';
             if (outCount > 0 || inCount > 0) return 'partial';
@@ -3917,6 +4170,332 @@
             }
         }
         window.nodesAction = nodesAction;
+
+        // ============ РЕЖИМ «API» (вкладка балансировки) ============
+        let   _apiBalEntries = [];                 // [{id, name, path, search_keys}]
+        let   _apiBalSelected = null;              // id
+        const _apiBalRotation = {};                // {entry_id: {key: bool|null}}
+        const _apiBalCheckSel = {};                // {entry_id: Set(keys)}
+        let   _apiBalRotPollTimer = null;          // авто-апдейт ротации во время прогона
+        let   _apiBalLastBusy     = false;         // отслеживаем переход busy→idle для финального апдейта
+
+        async function loadApiBalancerEntries() {
+            try {
+                const resp = await fetch('/api/api-balancer/entries');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const d = await resp.json();
+                _apiBalEntries = d.entries || [];
+                if (_apiBalSelected && !_apiBalEntries.find(e => e.id === _apiBalSelected)) {
+                    _apiBalSelected = null;
+                }
+                renderApiBalancerSidebar();
+                renderApiBalancerContent();
+                refreshApiControls();
+                fetchApiBalancerRotation();
+            } catch (e) {
+                const list = document.getElementById('apiList');
+                if (list) list.innerHTML = `<div class="muted" style="color:#fca5a5">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+        window.loadApiBalancerEntries = loadApiBalancerEntries;
+
+        function renderApiBalancerSidebar() {
+            const list = document.getElementById('apiList');
+            if (!list) return;
+            if (!_apiBalEntries.length) {
+                list.innerHTML = '<div class="nodes-hint">Записей нет. Заведи их в «Настройка API» → «Добавить».</div>';
+                return;
+            }
+            list.innerHTML = _apiBalEntries.map(e => {
+                const sel = (_apiBalCheckSel[e.id]?.size) || 0;
+                const cls = ['svc-list-row'];
+                if (_apiBalSelected === e.id) cls.push('active');
+                // Цвет индикатора по состоянию ротации:
+                //   • есть хоть один выведенный ключ — фиолетовый (drained);
+                //   • все ключи в ротации — зелёный (rot-in);
+                //   • данных ещё нет / нет ключей — без индикатора.
+                let titleHint = '';
+                if (_apiHasDrain(e.id)) {
+                    cls.push('drained');
+                    titleHint = ' title="Есть выведенные из ротации ключи"';
+                } else if (_apiAllIn(e.id)) {
+                    cls.push('rot-in');
+                    titleHint = ' title="Все ключи в ротации"';
+                }
+                const safeName = escapeHtml(e.name);
+                return `
+                    <div class="${cls.join(' ')}"${titleHint} onclick="selectApiEntry(${e.id})">
+                        <span class="svc-list-item">${safeName}</span>
+                        ${sel ? `<span class="svc-list-count">${sel}</span>` : ''}
+                    </div>`;
+            }).join('');
+        }
+
+        function _apiHasDrain(eid) {
+            const by = _apiBalRotation[eid];
+            if (!by) return false;
+            return Object.values(by).some(v => v === false);
+        }
+
+        function _apiAllIn(eid) {
+            const by = _apiBalRotation[eid];
+            if (!by) return false;
+            const vals = Object.values(by);
+            if (!vals.length) return false;
+            // Все известные ключи == true; null/unknown ⇒ ещё не доехали данные → не зажигаем
+            return vals.every(v => v === true);
+        }
+
+        function selectApiEntry(id) {
+            _apiBalSelected = id;
+            renderApiBalancerSidebar();
+            renderApiBalancerContent();
+            refreshApiControls();
+            fetchApiBalancerRotation([id]);
+        }
+        window.selectApiEntry = selectApiEntry;
+
+        function _apiKeyChecked(eid, k) {
+            return !!(_apiBalCheckSel[eid] && _apiBalCheckSel[eid].has(k));
+        }
+
+        function apiToggleKey(eid, key, checked) {
+            if (!_apiBalCheckSel[eid]) _apiBalCheckSel[eid] = new Set();
+            if (checked) _apiBalCheckSel[eid].add(key);
+            else         _apiBalCheckSel[eid].delete(key);
+            if (_apiBalCheckSel[eid].size === 0) delete _apiBalCheckSel[eid];
+            renderApiBalancerSidebar();
+            refreshApiControls();
+        }
+        window.apiToggleKey = apiToggleKey;
+
+        function apiToggleAllKeys(eid, checked) {
+            const e = _apiBalEntries.find(x => x.id === eid);
+            if (!e) return;
+            const keys = e.search_keys || [];
+            if (checked) _apiBalCheckSel[eid] = new Set(keys);
+            else         delete _apiBalCheckSel[eid];
+            renderApiBalancerContent();
+            renderApiBalancerSidebar();
+            refreshApiControls();
+        }
+        window.apiToggleAllKeys = apiToggleAllKeys;
+
+        function apiSelectAll(checked) {
+            if (checked) {
+                for (const e of _apiBalEntries) {
+                    _apiBalCheckSel[e.id] = new Set(e.search_keys || []);
+                }
+            } else {
+                for (const k of Object.keys(_apiBalCheckSel)) delete _apiBalCheckSel[k];
+            }
+            renderApiBalancerSidebar();
+            renderApiBalancerContent();
+            refreshApiControls();
+        }
+        window.apiSelectAll = apiSelectAll;
+
+        function apiToggleGroup(eid, gk, checked) {
+            const e = _apiBalEntries.find(x => x.id === eid);
+            if (!e) return;
+            const grouped = e.search_keys_grouped || {};
+            const items = grouped[gk] || [];
+            if (!_apiBalCheckSel[eid]) _apiBalCheckSel[eid] = new Set();
+            items.forEach(it => {
+                const k = typeof it === 'string' ? it : it.key;
+                if (checked) _apiBalCheckSel[eid].add(k);
+                else         _apiBalCheckSel[eid].delete(k);
+            });
+            if (_apiBalCheckSel[eid].size === 0) delete _apiBalCheckSel[eid];
+            renderApiBalancerContent();
+            renderApiBalancerSidebar();
+            refreshApiControls();
+        }
+        window.apiToggleGroup = apiToggleGroup;
+
+        function renderApiBalancerContent() {
+            const box = document.getElementById('apiContent');
+            if (!box) return;
+            if (!_apiBalSelected) {
+                box.innerHTML = '<div class="svc-empty">Выберите запись API</div>';
+                return;
+            }
+            const e = _apiBalEntries.find(x => x.id === _apiBalSelected);
+            if (!e) {
+                box.innerHTML = '<div class="svc-empty">Запись удалена</div>';
+                return;
+            }
+            const grouped = e.search_keys_grouped || {};
+            const flatKeys = e.search_keys || [];
+            const rot = _apiBalRotation[e.id] || {};
+
+            const groupOrder = Object.keys(grouped).sort((a, b) =>
+                a === '' ? 1 : b === '' ? -1 : a.localeCompare(b));
+            const allChecked = flatKeys.length > 0 && flatKeys.every(k => _apiKeyChecked(e.id, k));
+            const headerCb = `<input type="checkbox" class="ms-checkbox" ${allChecked ? 'checked' : ''}
+                                 onchange="apiToggleAllKeys(${e.id}, this.checked)" title="Выделить всё">`;
+
+            const groupSections = groupOrder.length
+                ? groupOrder.map(gk => {
+                    const items = grouped[gk] || [];   // [{key, alias}]
+                    const groupTitle = gk === '' ? 'Без плеча' : gk;
+                    const groupAllChecked = items.length > 0 && items.every(it => _apiKeyChecked(e.id, it.key));
+                    const safeGk = gk.replace(/'/g, "\\'");
+                    const rows = items.map(it => {
+                        const v = rot[it.key];
+                        let cls = 'empty', text = '—';
+                        if (v === true)       { cls = 'in';  text = 'ДА'; }
+                        else if (v === false) { cls = 'out'; text = 'НЕТ'; }
+                        const display = it.alias && it.alias.trim() ? it.alias : it.key;
+                        const tooltip = it.alias && it.alias !== it.key ? it.key : '';
+                        return `
+                            <div class="svc-host-pill" style="grid-template-columns:22px 1fr 80px">
+                                <input type="checkbox" class="ms-checkbox" ${_apiKeyChecked(e.id, it.key) ? 'checked' : ''}
+                                       onclick="apiToggleKey(${e.id}, '${it.key.replace(/'/g, "\\'")}', this.checked)">
+                                <span class="svc-host-link" style="cursor:default"${tooltip ? ` title="${escapeHtml(tooltip)}"` : ''}>${escapeHtml(display)}</span>
+                                <span class="svc-host-rotation ${cls}">${text}</span>
+                            </div>`;
+                    }).join('');
+                    return `
+                        <div class="svc-host-group">
+                            <div class="svc-host-group-title">${escapeHtml(groupTitle)}</div>
+                            <div class="svc-host-list">
+                                <div class="svc-host-header" style="grid-template-columns:22px 1fr 80px">
+                                    <input type="checkbox" class="ms-checkbox" ${groupAllChecked ? 'checked' : ''}
+                                           onclick="apiToggleGroup(${e.id}, '${safeGk}', this.checked)"
+                                           title="Выделить всё плечо">
+                                    <span>Ключ</span>
+                                    <span class="col-rotation">В ротации</span>
+                                </div>
+                                ${rows}
+                            </div>
+                        </div>`;
+                }).join('')
+                : '<div class="nodes-hint">У записи нет ключей поиска. Добавь их в «Настройка API».</div>';
+
+            box.innerHTML = `
+                <div class="svc-content-title">${escapeHtml(e.name)}</div>
+                <div class="muted" style="font-size:11px;font-family:ui-monospace,monospace;margin-bottom:10px">
+                    ${escapeHtml(e.path)} <span style="color:#6b7280">(внешний nginx)</span>
+                    ${flatKeys.length > 0 ? `<label style="margin-left:14px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#cbd5e1">${headerCb}<span>Выделить все ключи</span></label>` : ''}
+                </div>
+                ${groupSections}`;
+
+            // Tristate сайдбарного «Выделить все»
+            const allCb = document.getElementById('apiSelectAllCb');
+            if (allCb) {
+                const totalKeys = _apiBalEntries.reduce((n, en) => n + ((en.search_keys || []).length), 0);
+                const checkedKeys = Object.values(_apiBalCheckSel).reduce((n, s) => n + (s?.size || 0), 0);
+                allCb.checked = totalKeys > 0 && checkedKeys === totalKeys;
+                allCb.indeterminate = checkedKeys > 0 && checkedKeys < totalKeys;
+            }
+        }
+
+        async function fetchApiBalancerRotation(entryIds) {
+            try {
+                const body = entryIds && entryIds.length ? {entry_ids: entryIds} : {};
+                const resp = await fetch('/api/api-balancer/rotation', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body),
+                });
+                if (!resp.ok) return;
+                const d = await resp.json();
+                const results = d.results || {};
+                for (const k of Object.keys(results)) {
+                    _apiBalRotation[Number(k)] = results[k];
+                }
+                renderApiBalancerSidebar();
+                renderApiBalancerContent();
+            } catch {}
+        }
+
+        async function apiRefresh() {
+            await fetchApiBalancerRotation();
+            toast('Ротация обновлена', 'ok');
+        }
+        window.apiRefresh = apiRefresh;
+
+        function refreshApiControls() {
+            const sel = Object.values(_apiBalCheckSel).reduce((n, s) => n + (s?.size || 0), 0);
+            const busy = !!_svcRunState?.busy;
+            const drainBtn  = document.getElementById('apiDrainBtn');
+            const returnBtn = document.getElementById('apiReturnBtn');
+            const disabled = sel === 0 || busy;
+            if (drainBtn)  drainBtn.disabled  = disabled;
+            if (returnBtn) returnBtn.disabled = disabled;
+        }
+        window.refreshApiControls = refreshApiControls;
+
+        async function apiAction(action) {
+            if (!['drain', 'return'].includes(action)) return;
+            const items = [];
+            let totalKeys = 0;
+            for (const e of _apiBalEntries) {
+                const sel = _apiBalCheckSel[e.id];
+                if (!sel || !sel.size) continue;
+                const keys = [...sel].sort();
+                items.push({entry_id: e.id, keys, name: e.name, path: e.path});
+                totalKeys += keys.length;
+            }
+            if (!items.length) return;
+            const meta = action === 'drain'
+                ? {title: 'Вывод из ротации (API)', verb: 'вывести из ротации',
+                   ok: 'Вывести', kind: 'warn', cls: 'btn-warn', backendAction: 'api_drain'}
+                : {title: 'Ввод в ротацию (API)', verb: 'ввести в ротацию',
+                   ok: 'Ввести', kind: 'success', cls: 'btn-success', backendAction: 'api_return'};
+
+            const groups = items.map(it => ({
+                title: it.name,
+                total: it.keys.length,
+                subgroups: [{
+                    label: it.path,
+                    hosts: it.keys,
+                }],
+            }));
+            const flags = [
+                { label: `${items.length} файл(ов)` },
+                { label: `${totalKeys} ключ(ей)` },
+                { label: 'внешний nginx' },
+            ];
+            const ok = await confirmModal({
+                title: meta.title,
+                message: `Действие будет применено ко всем выделенным ключам в указанных файлах на внешнем nginx.`,
+                groups,
+                flags,
+                kind: meta.kind,
+                confirmText: meta.ok,
+                confirmClass: meta.cls,
+            });
+            if (!ok) return;
+
+            const apiBtns = ['apiDrainBtn', 'apiReturnBtn'].map(id => document.getElementById(id)).filter(Boolean);
+            apiBtns.forEach(b => b.disabled = true);
+            try {
+                const resp = await fetch('/api/api-balancer/orchestrate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        action: meta.backendAction,
+                        items: items.map(it => ({entry_id: it.entry_id, keys: it.keys})),
+                    }),
+                });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    toast(data.error || `Ошибка ${resp.status}`, 'err');
+                    return;
+                }
+                fetchSvcRunState();
+                fetchSvcServerLog();
+                // После запуска — переоткроем ротацию через пару секунд
+                setTimeout(() => fetchApiBalancerRotation(), 2000);
+            } catch (e) {
+                toast(`Сеть: ${e.message}`, 'err');
+            } finally {
+                refreshApiControls();
+            }
+        }
+        window.apiAction = apiAction;
 
         // ===== Очистка UI-лога на старте нового прогона =====
         // В БД (svc_console) все строки остаются; мы только перемещаем курсор
@@ -4195,22 +4774,52 @@
         }
 
         let _svcHandledRunId = null;
+        let _svcInitialCutoffApplied = false;
         async function fetchSvcRunState() {
             try {
                 const resp = await fetch('/api/svc/orchestrate/state');
                 if (!resp.ok) return;
                 _svcRunState = await resp.json();
+                const s = _svcRunState;
+                // На первом ответе подтягиваем отсечку из БД, чтобы НЕ тянуть в UI
+                // лог завершённых ранее операций. Делается один раз за загрузку
+                // страницы; новые отсечки приходят при смене run_id ниже.
+                if (!_svcInitialCutoffApplied) {
+                    if (Number.isInteger(s?.log_cutoff_action) && s.log_cutoff_action > _svcLogLastIds.action) {
+                        _svcLogLastIds.action = s.log_cutoff_action;
+                    }
+                    if (Number.isInteger(s?.log_cutoff_error) && s.log_cutoff_error > _svcLogLastIds.error) {
+                        _svcLogLastIds.error = s.log_cutoff_error;
+                    }
+                    _svcInitialCutoffApplied = true;
+                }
                 // Смена run_id (или его появление) — признак старта нового прогона.
                 // Все клиенты, увидев новый run_id в /state, чистят UI-лог
                 // по общей для всех отсечке из сервера.
-                const s = _svcRunState;
                 if (s && s.busy && s.run_id && s.run_id !== _svcHandledRunId) {
                     _resetSvcLogForNewRun(s.log_cutoff_action, s.log_cutoff_error);
                     _svcHandledRunId = s.run_id;
                 }
                 renderSvcRunBanner();
                 refreshSvcControls();
+                if (typeof refreshApiControls === 'function') refreshApiControls();
                 updateRefreshBtnState();
+
+                // API: пока прогон идёт — обновляем ротацию каждые 3с,
+                // на переходе busy→idle делаем финальный апдейт.
+                const apiBusyNow = !!_svcRunState.busy
+                    && (_svcRunState.action === 'api_drain' || _svcRunState.action === 'api_return');
+                if (apiBusyNow && !_apiBalRotPollTimer) {
+                    _apiBalRotPollTimer = setInterval(fetchApiBalancerRotation, 3000);
+                } else if (!apiBusyNow && _apiBalRotPollTimer) {
+                    clearInterval(_apiBalRotPollTimer);
+                    _apiBalRotPollTimer = null;
+                }
+                if (_apiBalLastBusy && !apiBusyNow) {
+                    // только что закончили — последний фетч, чтобы UI отразил итог
+                    fetchApiBalancerRotation();
+                }
+                _apiBalLastBusy = apiBusyNow;
 
                 // Автоопрос статусов во время операции (раз в 5 с)
                 const busy = !!_svcRunState.busy;
@@ -4234,9 +4843,10 @@
 
         function startSvcOrchPolling() {
             stopSvcOrchPolling();
-            // первый раз сразу
-            fetchSvcRunState();
-            fetchSvcServerLog();
+            // Первый раз: state ДО лога — иначе fetchSvcServerLog успеет уйти с
+            // since_action=0 раньше, чем мы узнаем отсечку, и в UI всплывёт
+            // история прошлых прогонов.
+            fetchSvcRunState().then(fetchSvcServerLog);
             _svcRunStateTimer = setInterval(fetchSvcRunState, 2000);
             _svcLogTimer      = setInterval(fetchSvcServerLog, 2000);
         }
@@ -4259,7 +4869,7 @@
             }
             const me = state.me?.username;
             const canCancel = (s.username === me) || state.me?.role === 'admin';
-            const since = s.started_at ? new Date(s.started_at * 1000).toLocaleTimeString('ru-RU',{hour12:false}) : '?';
+            const since = s.started_at ? new Date(s.started_at * 1000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '?';
             const actLabel = {
                 restart: 'Перезагрузка с балансировкой',
                 restart_raw: 'Перезагрузка без балансировки',
@@ -4267,13 +4877,19 @@
                 stop: 'Выключение',
                 drain: 'Вывод из ротации',
                 return: 'Ввод в ротацию',
+                api_drain:  'Вывод из ротации (API)',
+                api_return: 'Ввод в ротацию (API)',
             }[s.action] || s.action;
+            const total = Number(s.progress_total) || 0;
+            const done  = Math.min(Number(s.progress_done) || 0, total);
+            const pct   = total > 0 ? Math.floor(done * 100 / total) : 0;
+            const progressMark = total > 0 ? ` ${done}/${total} ${pct}%` : '';
             const cancelMark = s.cancel_requested ? ' <span style="color:#fde68a">(прерывание запрошено)</span>' : '';
             wrap.style.display = '';
             wrap.innerHTML = `
                 <div class="svc-run-banner">
                     <span class="svc-run-banner-lock">🔒</span>
-                    <span class="svc-run-banner-text">Идёт <strong>${escapeHtml(actLabel)}</strong> от <strong>${escapeHtml(s.username || '?')}</strong>, начата в ${since}${cancelMark}</span>
+                    <span class="svc-run-banner-text">Идёт <strong>${escapeHtml(actLabel + progressMark)}</strong> от <strong>${escapeHtml(s.username || '?')}</strong>, начата в ${since}${cancelMark}</span>
                     ${canCancel && !s.cancel_requested
                         ? `<button type="button" class="svc-clear-btn" onclick="svcCancelRun()">Прервать</button>`
                         : ''}
@@ -4469,6 +5085,7 @@
                     if (r.ok) {
                         const d = await r.json();
                         _svcRotation[_svcSelected] = (d.results || {})[_svcSelected] || {};
+                        Object.assign(_svcPathsBySvc, d.paths_by_svc || {});
                     }
                 } catch {}
             }
@@ -4479,7 +5096,10 @@
         function _svcHasDrain(svc) {
             const by = _svcRotation[svc];
             if (!by) return false;
-            return Object.values(by).some(v => v === false);
+            return Object.values(by).some(v => {
+                const s = _rotSummary(v);
+                return s === false || s === 'mixed';
+            });
         }
 
         async function fetchAllSvcRotation() {
@@ -4503,6 +5123,7 @@
                 for (const svc of Object.keys(results)) {
                     _svcRotation[svc] = { ...(_svcRotation[svc] || {}), ...results[svc] };
                 }
+                Object.assign(_svcPathsBySvc, d.paths_by_svc || {});
                 renderSvcSidebar();
             } catch {}
         }
@@ -4580,6 +5201,28 @@
             };
             const safeSvc = _svcSelected.replace(/'/g, "\\'");
             const isHostChecked = (host) => !!(_svcCheckSel[_svcSelected] && _svcCheckSel[_svcSelected].has(host));
+            // По одной колонке на каждый nginx-файл этого сервиса
+            // (пользовательский запрос: видеть статус ротации в КАЖДОМ файле отдельно).
+            const isBalancedSvc = !NOT_BALANCED_SVCS.has(_svcSelected);
+            const pathsCfg = _svcPathsBySvc[_svcSelected] || {int: [], ext: []};
+            const rotCols = [
+                ...(pathsCfg.int || []).map(p => ({path: p, bal: 'int'})),
+                ...(pathsCfg.ext || []).map(p => ({path: p, bal: 'ext'})),
+            ];
+            const nCols = rotCols.length;
+            // grid-template-columns: чекбокс, имя хоста, версия, N×ротации, статус.
+            // 90px на каждый файловый столбец — даёт место под basename из 2-3 строк.
+            const gridCols = `22px 105px 70px ${nCols ? '90px '.repeat(nCols) : '70px '}110px`;
+            const headerCells = nCols
+                ? rotCols.map(c => {
+                    const basename = c.path.split('/').pop() || c.path;
+                    const balLbl = c.bal === 'int' ? 'Внутр.' : 'Внеш.';
+                    // basename может быть длинным — рендерим в файловом стиле,
+                    // tooltip даёт полный путь.
+                    return `<span class="col-rotation file" title="${escapeHtml(balLbl + ': ' + c.path)}">${escapeHtml(basename)}</span>`;
+                  }).join('')
+                : `<span class="col-rotation">В ротации</span>`;
+
             const groupsHtml = order.filter(g => byGroup[g]).map(g => {
                 const groupHosts = byGroup[g];
                 const checkedHere = groupHosts.filter(h => isHostChecked(h)).length;
@@ -4589,33 +5232,41 @@
                 <div class="svc-host-group">
                     <div class="svc-host-group-title">${escapeHtml(g)}</div>
                     <div class="svc-host-list">
-                        <div class="svc-host-header">
+                        <div class="svc-host-header" style="grid-template-columns:${gridCols}">
                             <input type="checkbox" class="ms-checkbox" data-svc-group="${escapeHtml(g)}"
                                    ${allChecked ? 'checked' : ''}
                                    onclick="toggleSvcGroup('${safeSvc}', '${safeGroup}', this.checked)"
                                    title="Выделить всё плечо">
                             <span>Хост</span>
                             <span class="col-version">Версия</span>
-                            <span class="col-rotation">В ротации</span>
+                            ${headerCells}
                             <span class="col-status">Статус</span>
                         </div>
                         ${byGroup[g].map(h => {
                             const ver = _svcVersions[h] || '';
-                            const isBalanced = !NOT_BALANCED_SVCS.has(_svcSelected);
-                            const inRot = _svcRotation[_svcSelected]?.[h];   // true / false / undefined
-                            let rotCls = 'empty', rotText = '—';
-                            if (isBalanced) {
-                                if (inRot === true)       { rotCls = 'in';  rotText = 'ДА'; }
-                                else if (inRot === false) { rotCls = 'out'; rotText = 'НЕТ'; }
-                                // если данных нет — оставляем «—» (не врём, что в ротации)
+                            const rotVal = _svcRotation[_svcSelected]?.[h];
+                            let rotHtml;
+                            if (!isBalancedSvc || nCols === 0) {
+                                rotHtml = '<span class="svc-host-rotation empty">—</span>';
+                            } else {
+                                rotHtml = rotCols.map(c => {
+                                    const byPath = (c.bal === 'int' ? rotVal?.int : rotVal?.ext) || {};
+                                    const v = byPath[c.path];
+                                    let cls = 'empty', text = '—';
+                                    if (v === true)       { cls = 'in';  text = 'ДА'; }
+                                    else if (v === false) { cls = 'out'; text = 'НЕТ'; }
+                                    const balLbl = c.bal === 'int' ? 'Внутр.' : 'Внеш.';
+                                    const title = `${balLbl}: ${c.path}`;
+                                    return `<span class="svc-host-rotation ${cls}" title="${escapeHtml(title)}">${text}</span>`;
+                                }).join('');
                             }
                             return `
-                            <div class="svc-host-pill">
+                            <div class="svc-host-pill" style="grid-template-columns:${gridCols}">
                                 <input type="checkbox" class="ms-checkbox" ${isHostChecked(h) ? 'checked' : ''}
                                        onclick="toggleSvcHost('${safeSvc}', '${h.replace(/'/g, "\\'")}', this.checked)">
                                 <a class="svc-host-link" href="http://${encodeURI(HOST_FQDN[h] || h)}:9223" target="_blank" rel="noopener noreferrer" title="Открыть http://${escapeHtml(HOST_FQDN[h] || h)}:9223">${escapeHtml(h)}</a>
                                 <span class="svc-host-version ${ver ? '' : 'empty'}">${ver ? escapeHtml(ver) : '—'}</span>
-                                <span class="svc-host-rotation ${rotCls}">${rotText}</span>
+                                ${rotHtml}
                                 ${renderStatus(h)}
                             </div>`;
                         }).join('')}
@@ -4811,51 +5462,65 @@
             return 'unknown';
         }
 
+        // Реестр двух stunnel-серверов (kind → label, urls)
+        const STUNNEL_LIST = [
+            { kind: 'sbp', label: 'nginx SBP', statusUrl: '/api/stunnel/status',     actUrl: a => `/api/stunnel/${a}` },
+            { kind: 'brs', label: 'nginx BRS', statusUrl: '/api/stunnel-brs/status', actUrl: a => `/api/stunnel-brs/${a}` },
+        ];
+
         async function loadStunnel() {
             const root = document.getElementById('stunnelArea');
             if (!root) return;
-            try {
-                const resp = await fetch('/api/stunnel/status');
-                if (!resp.ok) {
-                    const data = await resp.json().catch(() => ({}));
-                    root.innerHTML = `<div class="muted" style="color:#fca5a5;max-width:760px">Не удалось получить статус: ${escapeHtml(data.error || 'HTTP ' + resp.status)}</div>`;
-                    return;
+            // Подгружаем оба статуса параллельно
+            const fetched = await Promise.all(STUNNEL_LIST.map(async s => {
+                try {
+                    const resp = await fetch(s.statusUrl);
+                    if (!resp.ok) {
+                        const data = await resp.json().catch(() => ({}));
+                        return { ...s, error: data.error || `HTTP ${resp.status}` };
+                    }
+                    return { ...s, ...(await resp.json()) };
+                } catch (e) {
+                    return { ...s, error: `Сеть: ${e.message}` };
                 }
-                const d = await resp.json();
-                renderStunnel(d);
-            } catch (e) {
-                root.innerHTML = `<div class="muted" style="color:#fca5a5;max-width:760px">Сеть: ${escapeHtml(e.message)}</div>`;
-            }
+            }));
+            root.innerHTML = fetched.map(d => {
+                if (d.error) {
+                    return `
+                        <div class="stunnel-card">
+                            <div class="stunnel-card-title">${escapeHtml(d.label)}</div>
+                            <div class="muted" style="color:#fca5a5">${escapeHtml(d.error)}</div>
+                        </div>`;
+                }
+                const cls = _stunnelStatusClass(d.is_active);
+                const stateText = (d.is_active || 'unknown').toUpperCase();
+                return `
+                    <div class="stunnel-card">
+                        <div class="stunnel-card-title">${escapeHtml(d.label)}</div>
+                        <div class="stunnel-status ${cls}">
+                            <span class="dot"></span>
+                            <span class="label">
+                                <span class="state">${escapeHtml(stateText)}</span>
+                                <span class="host">${escapeHtml(d.host || '')}</span>
+                            </span>
+                        </div>
+                        <div class="stunnel-actions">
+                            <button type="button" class="ms-action-btn restart" onclick="stunnelAct('${d.kind}', 'restart', this)">Перезагрузить</button>
+                            <button type="button" class="ms-action-btn start"   onclick="stunnelAct('${d.kind}', 'start', this)">Включить</button>
+                            <button type="button" class="ms-action-btn stop"    onclick="stunnelAct('${d.kind}', 'stop', this)">Выключить</button>
+                            <button type="button" class="svc-tool-btn" onclick="loadStunnel()">⟳ Обновить</button>
+                        </div>
+                    </div>`;
+            }).join('');
         }
         window.loadStunnel = loadStunnel;
 
-        function renderStunnel(d) {
-            const root = document.getElementById('stunnelArea');
-            if (!root) return;
-            const cls = _stunnelStatusClass(d.is_active);
-            const stateText = (d.is_active || 'unknown').toUpperCase();
-            root.innerHTML = `
-                <div class="stunnel-card">
-                    <div class="stunnel-status ${cls}">
-                        <span class="dot"></span>
-                        <span class="label">
-                            <span class="state">${escapeHtml(stateText)}</span>
-                            <span class="host">${escapeHtml(d.host || '')}</span>
-                        </span>
-                    </div>
-                    <div class="stunnel-actions">
-                        <button type="button" class="ms-action-btn restart" onclick="stunnelAct('restart', this)">Перезагрузить</button>
-                        <button type="button" class="ms-action-btn start"   onclick="stunnelAct('start', this)">Включить</button>
-                        <button type="button" class="ms-action-btn stop"    onclick="stunnelAct('stop', this)">Выключить</button>
-                        <button type="button" class="svc-tool-btn" onclick="loadStunnel()">⟳ Обновить</button>
-                    </div>
-                </div>`;
-        }
-
-        async function stunnelAct(action, btn) {
+        async function stunnelAct(kind, action, btn) {
+            const cfg = STUNNEL_LIST.find(s => s.kind === kind);
+            if (!cfg) return;
             const labels = {start: 'включить', stop: 'выключить', restart: 'перезагрузить'};
             const ok = await confirmModal({
-                title: `${labels[action].charAt(0).toUpperCase() + labels[action].slice(1)} stunnel?`,
+                title: `${labels[action].charAt(0).toUpperCase() + labels[action].slice(1)} stunnel «${cfg.label}»?`,
                 message: 'Действие выполнится на удалённом сервере через SSH.',
                 kind: action === 'stop' ? 'danger' : 'warn',
                 confirmText: labels[action].charAt(0).toUpperCase() + labels[action].slice(1),
@@ -4863,16 +5528,15 @@
                 compact: true,
             });
             if (!ok) return;
-            // Дисейбл всех кнопок панели на время запроса
             const all = btn.parentElement.querySelectorAll('button');
             all.forEach(b => b.disabled = true);
             try {
-                const resp = await fetch(`/api/stunnel/${action}`, {method: 'POST'});
+                const resp = await fetch(cfg.actUrl(action), {method: 'POST'});
                 const data = await resp.json().catch(() => ({}));
                 if (!resp.ok || !data.ok) {
                     toast(data.error || `Ошибка ${resp.status}`, 'err');
                 } else {
-                    toast(`stunnel: ${data.is_active}`, 'ok');
+                    toast(`${cfg.label}: ${data.is_active}`, 'ok');
                 }
                 await loadStunnel();
             } catch (e) {
@@ -5050,8 +5714,8 @@
                             <div class="cred-card-head">
                                 <span class="cred-card-icon">🔗</span>
                                 <div>
-                                    <div class="cred-card-title">SSH к балансировщику nginx</div>
-                                    <div class="cred-card-sub">Для drain/return микросервисов и reload nginx</div>
+                                    <div class="cred-card-title">SSH к внутреннему nginx-балансировщику</div>
+                                    <div class="cred-card-sub">Для вывода/ввода микросервисов в ротацию и reload nginx</div>
                                 </div>
                             </div>
                             <div class="field" style="display:grid;grid-template-columns:1fr 90px;gap:10px">
@@ -5088,6 +5752,46 @@
 
                         <div class="cred-card">
                             <div class="cred-card-head">
+                                <span class="cred-card-icon">🌐</span>
+                                <div>
+                                    <div class="cred-card-title">SSH к внешнему nginx-балансировщику</div>
+                                    <div class="cred-card-sub">Используется для сервисов, которые балансируются ещё и снаружи</div>
+                                </div>
+                            </div>
+                            <div class="field" style="display:grid;grid-template-columns:1fr 90px;gap:10px">
+                                <div>
+                                    <label for="bcExtSshHost">Хост</label>
+                                    <input type="text" id="bcExtSshHost" autocomplete="off" spellcheck="false" placeholder="ext-balancer.uniservers.ru" value="${escapeHtml(c.ext_ssh_host || '')}">
+                                </div>
+                                <div>
+                                    <label for="bcExtSshPort">Порт</label>
+                                    <input type="text" id="bcExtSshPort" inputmode="numeric" maxlength="5"
+                                           value="${c.ext_ssh_port || 22}"
+                                           oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 5)">
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label for="bcExtSshLogin">Логин</label>
+                                <input type="text" id="bcExtSshLogin" autocomplete="off" spellcheck="false" value="${escapeHtml(c.ext_ssh_login || '')}">
+                            </div>
+                            <div class="field">
+                                <label for="bcExtSshPassword">Пароль ${c.ext_ssh_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="bcExtSshPassword" autocomplete="new-password" placeholder="${c.ext_ssh_password_set ? '••••••••' : 'введите пароль'}">
+                            </div>
+                            <div class="field" style="margin-bottom:0">
+                                <label for="bcExtSshSudoPwd">Пароль для sudo ${c.ext_ssh_sudo_pwd_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="bcExtSshSudoPwd" autocomplete="new-password" placeholder="${c.ext_ssh_sudo_pwd_set ? '••••••••' : 'введите пароль для sudo'}">
+                                <div class="field-hint">Если sudo без пароля — оставьте пустым</div>
+                            </div>
+                            <div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">
+                                <button type="button" class="btn btn-primary" style="min-width:120px;justify-content:center" onclick="saveCredCard('ext_ssh', this)">Сохранить</button>
+                                <button type="button" class="btn btn-ghost" style="min-width:170px;justify-content:center" onclick="testCred('ext_balancer', this, 'bcExtTestResult')">Проверить SSH + nginx -t</button>
+                                <span class="muted" id="bcExtTestResult" style="font-size:12px"></span>
+                            </div>
+                        </div>
+
+                        <div class="cred-card">
+                            <div class="cred-card-head">
                                 <span class="cred-card-icon">🪟</span>
                                 <div>
                                     <div class="cred-card-title">NTLM (Inceptum API на нодах)</div>
@@ -5114,14 +5818,14 @@
                             <div class="cred-card-head">
                                 <span class="cred-card-icon">🛡️</span>
                                 <div>
-                                    <div class="cred-card-title">SSH к stunnel-серверу</div>
-                                    <div class="cred-card-sub">Управление службой stunnel (вкладка «Stunnel»)</div>
+                                    <div class="cred-card-title">SSH к stunnel «nginx SBP»</div>
+                                    <div class="cred-card-sub">Управление службой stunnel SBP (вкладка «Stunnel»)</div>
                                 </div>
                             </div>
                             <div class="field" style="display:grid;grid-template-columns:1fr 90px;gap:10px">
                                 <div>
                                     <label for="bcStunnelHost">Хост</label>
-                                    <input type="text" id="bcStunnelHost" autocomplete="off" spellcheck="false" placeholder="stunnel.uniservers.ru" value="${escapeHtml(c.stunnel_host || '')}">
+                                    <input type="text" id="bcStunnelHost" autocomplete="off" spellcheck="false" placeholder="stunnel-sbp.uniservers.ru" value="${escapeHtml(c.stunnel_host || '')}">
                                 </div>
                                 <div>
                                     <label for="bcStunnelPort">Порт</label>
@@ -5145,8 +5849,48 @@
                             </div>
                             <div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">
                                 <button type="button" class="btn btn-primary" style="min-width:120px;justify-content:center" onclick="saveCredCard('stunnel', this)">Сохранить</button>
-                                <button type="button" class="btn btn-ghost" style="min-width:200px;justify-content:center" onclick="testCred('stunnel', this, 'bcStunnelTestResult')">Проверить SSH к stunnel</button>
+                                <button type="button" class="btn btn-ghost" style="min-width:200px;justify-content:center" onclick="testCred('stunnel', this, 'bcStunnelTestResult')">Проверить SSH к SBP</button>
                                 <span class="muted" id="bcStunnelTestResult" style="font-size:12px"></span>
+                            </div>
+                        </div>
+
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">🛡️</span>
+                                <div>
+                                    <div class="cred-card-title">SSH к stunnel «nginx BRS»</div>
+                                    <div class="cred-card-sub">Управление вторым сервером stunnel BRS</div>
+                                </div>
+                            </div>
+                            <div class="field" style="display:grid;grid-template-columns:1fr 90px;gap:10px">
+                                <div>
+                                    <label for="bcStunnelBrsHost">Хост</label>
+                                    <input type="text" id="bcStunnelBrsHost" autocomplete="off" spellcheck="false" placeholder="stunnel-brs.uniservers.ru" value="${escapeHtml(c.stunnel_brs_host || '')}">
+                                </div>
+                                <div>
+                                    <label for="bcStunnelBrsPort">Порт</label>
+                                    <input type="text" id="bcStunnelBrsPort" inputmode="numeric" maxlength="5"
+                                           value="${c.stunnel_brs_port || 22}"
+                                           oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 5)">
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label for="bcStunnelBrsLogin">Логин</label>
+                                <input type="text" id="bcStunnelBrsLogin" autocomplete="off" spellcheck="false" value="${escapeHtml(c.stunnel_brs_login || '')}">
+                            </div>
+                            <div class="field">
+                                <label for="bcStunnelBrsPassword">Пароль ${c.stunnel_brs_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="bcStunnelBrsPassword" autocomplete="new-password" placeholder="${c.stunnel_brs_password_set ? '••••••••' : 'введите пароль'}">
+                            </div>
+                            <div class="field" style="margin-bottom:0">
+                                <label for="bcStunnelBrsSudoPwd">Пароль для sudo ${c.stunnel_brs_sudo_pwd_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="bcStunnelBrsSudoPwd" autocomplete="new-password" placeholder="${c.stunnel_brs_sudo_pwd_set ? '••••••••' : 'введите пароль для sudo'}">
+                                <div class="field-hint">Если sudo без пароля — оставьте пустым</div>
+                            </div>
+                            <div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">
+                                <button type="button" class="btn btn-primary" style="min-width:120px;justify-content:center" onclick="saveCredCard('stunnel_brs', this)">Сохранить</button>
+                                <button type="button" class="btn btn-ghost" style="min-width:200px;justify-content:center" onclick="testCred('stunnel_brs', this, 'bcStunnelBrsTestResult')">Проверить SSH к BRS</button>
+                                <span class="muted" id="bcStunnelBrsTestResult" style="font-size:12px"></span>
                             </div>
                         </div>
 
@@ -5164,13 +5908,22 @@
             let body = {};
             let title = '';
             if (kind === 'ssh') {
-                title = 'SSH балансировщика';
+                title = 'SSH внутреннего балансировщика';
                 body = {
                     ssh_host:     document.getElementById('bcSshHost').value.trim(),
                     ssh_port:     parseInt(document.getElementById('bcSshPort').value, 10) || 22,
                     ssh_login:    document.getElementById('bcSshLogin').value.trim(),
                     ssh_password: document.getElementById('bcSshPassword').value,
                     ssh_sudo_pwd: document.getElementById('bcSshSudoPwd').value,
+                };
+            } else if (kind === 'ext_ssh') {
+                title = 'SSH внешнего балансировщика';
+                body = {
+                    ext_ssh_host:     document.getElementById('bcExtSshHost').value.trim(),
+                    ext_ssh_port:     parseInt(document.getElementById('bcExtSshPort').value, 10) || 22,
+                    ext_ssh_login:    document.getElementById('bcExtSshLogin').value.trim(),
+                    ext_ssh_password: document.getElementById('bcExtSshPassword').value,
+                    ext_ssh_sudo_pwd: document.getElementById('bcExtSshSudoPwd').value,
                 };
             } else if (kind === 'ntlm') {
                 title = 'NTLM (Inceptum)';
@@ -5179,13 +5932,22 @@
                     win_password: document.getElementById('bcWinPassword').value,
                 };
             } else if (kind === 'stunnel') {
-                title = 'SSH к stunnel';
+                title = 'SSH к stunnel SBP';
                 body = {
                     stunnel_host:     document.getElementById('bcStunnelHost').value.trim(),
                     stunnel_port:     parseInt(document.getElementById('bcStunnelPort').value, 10) || 22,
                     stunnel_login:    document.getElementById('bcStunnelLogin').value.trim(),
                     stunnel_password: document.getElementById('bcStunnelPassword').value,
                     stunnel_sudo_pwd: document.getElementById('bcStunnelSudoPwd').value,
+                };
+            } else if (kind === 'stunnel_brs') {
+                title = 'SSH к stunnel BRS';
+                body = {
+                    stunnel_brs_host:     document.getElementById('bcStunnelBrsHost').value.trim(),
+                    stunnel_brs_port:     parseInt(document.getElementById('bcStunnelBrsPort').value, 10) || 22,
+                    stunnel_brs_login:    document.getElementById('bcStunnelBrsLogin').value.trim(),
+                    stunnel_brs_password: document.getElementById('bcStunnelBrsPassword').value,
+                    stunnel_brs_sudo_pwd: document.getElementById('bcStunnelBrsSudoPwd').value,
                 };
             } else {
                 return;
@@ -5223,9 +5985,11 @@
 
         async function testCred(kind, btn, outId) {
             const urls = {
-                balancer: '/api/svc/test-balancer',
-                ntlm:     '/api/svc/test-ntlm',
-                stunnel:  '/api/svc/test-stunnel',
+                balancer:     '/api/svc/test-balancer',
+                ext_balancer: '/api/svc/test-ext-balancer',
+                ntlm:         '/api/svc/test-ntlm',
+                stunnel:      '/api/svc/test-stunnel',
+                stunnel_brs:  '/api/svc/test-stunnel-brs',
             };
             const url = urls[kind];
             if (!url) return;
@@ -5420,14 +6184,31 @@
                 return;
             }
             const rows = _msCatList.map(ms => {
-                const pathsHtml = ms.paths.length
-                    ? ms.paths.map(p => `<span class="ms-cat-path">${escapeHtml(p)}</span>`).join('')
+                const pathsInt = ms.paths || [];
+                const pathsExt = ms.paths_ext || [];
+                const pathsHtml = (pathsInt.length || pathsExt.length)
+                    ? [
+                        ...pathsInt.map(p => `<span class="ms-cat-path"><span style="color:#9ca3af">[внутр]</span> ${escapeHtml(p)}</span>`),
+                        ...pathsExt.map(p => `<span class="ms-cat-path"><span style="color:#9ca3af">[внеш]</span> ${escapeHtml(p)}</span>`),
+                      ].join('')
                     : '<span class="ms-cat-paths-empty">не балансируется</span>';
                 const nodePillsHtml = ms.nodes.length
                     ? ms.nodes.map(n => `<span class="ms-cat-node-pill">${escapeHtml(n)}</span>`).join('')
                     : '<span class="ms-cat-paths-empty">нет</span>';
-                const balCls = ms.balanced ? 'yes' : 'no';
-                const balText = ms.balanced ? `⚖ Да (${ms.paths.length} конф.)` : '— Нет';
+                let balCls, balText;
+                if (pathsInt.length && pathsExt.length) {
+                    balCls = 'yes';
+                    balText = `⚖ Внутр.(${pathsInt.length}) + Внеш.(${pathsExt.length})`;
+                } else if (pathsInt.length) {
+                    balCls = 'yes';
+                    balText = `⚖ Внутр. (${pathsInt.length} конф.)`;
+                } else if (pathsExt.length) {
+                    balCls = 'yes';
+                    balText = `⚖ Внеш. (${pathsExt.length} конф.)`;
+                } else {
+                    balCls = 'no';
+                    balText = '— Нет';
+                }
                 return `
                     <tr>
                         <td><span class="ms-cat-name">${escapeHtml(ms.name)}</span></td>
@@ -5454,16 +6235,35 @@
                 </table>`;
         }
 
+        function msCatToggleBalGroup(which) {
+            const cb   = document.getElementById('msCatBal' + which);
+            const wrap = document.getElementById('msCatPaths' + which + 'Wrap');
+            wrap.style.display = cb.checked ? '' : 'none';
+            if (!cb.checked) {
+                const ta = document.getElementById('msCatPaths' + (which === 'Int' ? '' : 'Ext'));
+                if (ta) ta.value = '';
+            }
+        }
+        window.msCatToggleBalGroup = msCatToggleBalGroup;
+
         async function openMsCatalogEditor(id) {
             _msCatEditingId = id;
             document.getElementById('msCatError').classList.remove('show');
             document.getElementById('msCatName').value = '';
             document.getElementById('msCatPaths').value = '';
+            document.getElementById('msCatPathsExt').value = '';
             const cur = id ? _msCatList.find(x => x.id === id) : null;
+            const hasInt = cur ? (cur.paths || []).length > 0 : false;
+            const hasExt = cur ? (cur.paths_ext || []).length > 0 : false;
+            document.getElementById('msCatBalInt').checked = hasInt;
+            document.getElementById('msCatBalExt').checked = hasExt;
+            document.getElementById('msCatPathsIntWrap').style.display = hasInt ? '' : 'none';
+            document.getElementById('msCatPathsExtWrap').style.display = hasExt ? '' : 'none';
             if (cur) {
                 document.getElementById('msCatTitle').textContent = `Редактировать «${cur.name}»`;
                 document.getElementById('msCatName').value = cur.name;
-                document.getElementById('msCatPaths').value = cur.paths.join('\n');
+                document.getElementById('msCatPaths').value = (cur.paths || []).join('\n');
+                document.getElementById('msCatPathsExt').value = (cur.paths_ext || []).join('\n');
                 document.getElementById('msCatDeleteBtn').style.display = '';
                 document.getElementById('msCatSubmitBtn').textContent = 'Сохранить';
             } else {
@@ -5592,8 +6392,18 @@
             const errBox = document.getElementById('msCatError');
             errBox.classList.remove('show');
             const name = document.getElementById('msCatName').value.trim();
-            const pathsRaw = document.getElementById('msCatPaths').value;
-            const paths = pathsRaw.split('\n').map(s => s.trim()).filter(Boolean);
+            const balInt = document.getElementById('msCatBalInt').checked;
+            const balExt = document.getElementById('msCatBalExt').checked;
+            const paths     = balInt ? document.getElementById('msCatPaths').value.split('\n').map(s => s.trim()).filter(Boolean) : [];
+            const paths_ext = balExt ? document.getElementById('msCatPathsExt').value.split('\n').map(s => s.trim()).filter(Boolean) : [];
+            if (balInt && !paths.length) {
+                errBox.textContent = 'Включена балансировка на внутреннем nginx — укажите хотя бы один путь';
+                errBox.classList.add('show'); return false;
+            }
+            if (balExt && !paths_ext.length) {
+                errBox.textContent = 'Включена балансировка на внешнем nginx — укажите хотя бы один путь';
+                errBox.classList.add('show'); return false;
+            }
             const nodes = [..._msCatNodeSel];
             try {
                 const url = _msCatEditingId
@@ -5603,7 +6413,7 @@
                 const resp = await fetch(url, {
                     method,
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name, paths, nodes}),
+                    body: JSON.stringify({name, paths, paths_ext, nodes}),
                 });
                 if (!resp.ok) {
                     const data = await resp.json().catch(() => ({}));
@@ -5666,6 +6476,223 @@
             }
         }
         window.deleteMsCatalogRow = deleteMsCatalogRow;
+
+        // ============ API SETTINGS (admin) ============
+        let _apiEntries = [];
+        let _apiEntryEditingId = null;
+
+        async function loadApiSettings() {
+            const root = document.getElementById('apiSettingsArea');
+            if (!root) return;
+            try {
+                const resp = await fetch('/api/api-balancer/entries');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                _apiEntries = data.entries || [];
+                renderApiSettings();
+            } catch (e) {
+                root.innerHTML = `<div class="muted" style="color:#fca5a5">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+        window.loadApiSettings = loadApiSettings;
+
+        function renderApiSettings() {
+            const root = document.getElementById('apiSettingsArea');
+            if (!root) return;
+            if (!_apiEntries.length) {
+                root.innerHTML = '<div class="muted">Записи ещё не добавлены.</div>';
+                return;
+            }
+            const rows = _apiEntries.map(e => {
+                const keys = (e.search_keys || []);
+                const grouped = e.search_keys_grouped || {};
+                const groupParts = Object.keys(grouped).sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)))
+                    .map(gk => {
+                        const lbl = gk === '' ? 'Без плеча' : gk;
+                        const items = (grouped[gk] || []);
+                        const pills = items.map(it => {
+                            // Поддержим и legacy-строки, и новые объекты {key, alias}
+                            const k = typeof it === 'string' ? it : it.key;
+                            const a = typeof it === 'string' ? '' : (it.alias || '');
+                            const display = a || k;
+                            const title = a && a !== k ? k : '';
+                            return `<span class="ms-cat-node-pill"${title ? ` title="${escapeHtml(title)}"` : ''}>${escapeHtml(display)}</span>`;
+                        }).join('');
+                        return `<div style="margin-bottom:4px"><span class="ms-cat-node-pill" style="background:rgba(99,102,241,0.18);border-color:rgba(99,102,241,0.4);color:#c7d2fe;font-weight:600;margin-right:6px">${escapeHtml(lbl)}</span>${pills}</div>`;
+                    });
+                const keysHtml = groupParts.length ? groupParts.join('') : '<span class="ms-cat-paths-empty">нет</span>';
+                return `
+                    <tr>
+                        <td><span class="ms-cat-name">${escapeHtml(e.name)}</span></td>
+                        <td><span class="ms-cat-path">${escapeHtml(e.path)}</span></td>
+                        <td>${keys.length}</td>
+                        <td><div class="ms-cat-node-pills">${keysHtml}</div></td>
+                        <td class="ms-cat-actions">
+                            <button class="icon-btn" title="Редактировать" onclick="openApiEntryEditor(${e.id})">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button class="icon-btn danger" title="Удалить" onclick="deleteApiEntryRow(${e.id})">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                            </button>
+                        </td>
+                    </tr>`;
+            }).join('');
+            root.innerHTML = `
+                <table class="ms-cat-table">
+                    <thead><tr>
+                        <th>Имя</th><th>Путь nginx</th><th>Ключей</th><th>Ключи по плечам</th><th></th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`;
+        }
+
+        async function openApiEntryEditor(id) {
+            _apiEntryEditingId = id;
+            document.getElementById('apiEntryError').classList.remove('show');
+            document.getElementById('apiEntryName').value = '';
+            document.getElementById('apiEntryPath').value = '';
+            const cur = id ? _apiEntries.find(x => x.id === id) : null;
+            if (cur) {
+                document.getElementById('apiEntryTitle').textContent = `Редактировать «${cur.name}»`;
+                document.getElementById('apiEntryName').value = cur.name;
+                document.getElementById('apiEntryPath').value = cur.path;
+                document.getElementById('apiEntryDeleteBtn').style.display = '';
+                document.getElementById('apiEntrySubmitBtn').textContent = 'Сохранить';
+            } else {
+                document.getElementById('apiEntryTitle').textContent = 'Новая запись';
+                document.getElementById('apiEntryDeleteBtn').style.display = 'none';
+                document.getElementById('apiEntrySubmitBtn').textContent = 'Создать';
+            }
+            await renderApiEntryKeyGroups(cur ? (cur.search_keys_grouped || {}) : {});
+            document.getElementById('apiEntryBackdrop').classList.add('open');
+            setTimeout(() => document.getElementById('apiEntryName').focus(), 30);
+        }
+        window.openApiEntryEditor = openApiEntryEditor;
+
+        async function renderApiEntryKeyGroups(grouped) {
+            const wrap = document.getElementById('apiEntryKeysGroups');
+            if (!wrap) return;
+            let groups = [];
+            try {
+                const r = await fetch('/api/ms/groups');
+                if (r.ok) groups = (await r.json()).groups || [];
+            } catch {}
+            const order = [...groups, {key: '', title: 'Без плеча'}];
+            wrap.innerHTML = order.map(g => {
+                // Дамп: каждая строка либо «key», либо «key | alias»
+                const items = (grouped[g.key] || []);
+                const text = items.map(it => {
+                    if (typeof it === 'string') return it;
+                    return it.alias ? `${it.key} | ${it.alias}` : it.key;
+                }).join('\n');
+                const safeKey = g.key.replace(/"/g, '&quot;');
+                return `
+                    <div style="display:flex;flex-direction:column;gap:6px">
+                        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.04em">${escapeHtml(g.title)}</div>
+                        <textarea data-api-key-group="${safeKey}" rows="3" autocomplete="off" spellcheck="false"
+                                  style="width:100%;padding:8px 10px;font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,255,255,0.04);color:#f3f4f6;border:1px solid rgba(255,255,255,0.1);border-radius:9px;outline:none;resize:vertical"
+                                  placeholder="server.long.name.com | short&#10;another.server | other">${escapeHtml(text)}</textarea>
+                    </div>`;
+            }).join('');
+            // Подсказка под textarea-ми (один раз)
+            const hint = document.createElement('div');
+            hint.className = 'field-hint';
+            hint.style.marginTop = '4px';
+            hint.textContent = 'Формат строки: «ключ» либо «ключ | короткое-имя» — короткое будет показано в UI вместо длинного.';
+            wrap.appendChild(hint);
+        }
+
+        function closeApiEntryEditor() {
+            document.getElementById('apiEntryBackdrop').classList.remove('open');
+            _apiEntryEditingId = null;
+        }
+        window.closeApiEntryEditor = closeApiEntryEditor;
+
+        async function saveApiEntry(e) {
+            e.preventDefault();
+            const errBox = document.getElementById('apiEntryError');
+            errBox.classList.remove('show');
+            const name = document.getElementById('apiEntryName').value.trim();
+            const path = document.getElementById('apiEntryPath').value.trim();
+            // Собираем словарь {group_key: [{key, alias}, ...]} из textarea-ов
+            const grouped = {};
+            document.querySelectorAll('#apiEntryKeysGroups textarea[data-api-key-group]').forEach(t => {
+                const gk = t.dataset.apiKeyGroup;
+                const items = t.value.split('\n').map(s => s.trim()).filter(Boolean).map(line => {
+                    const idx = line.indexOf('|');
+                    if (idx >= 0) {
+                        const key   = line.slice(0, idx).trim();
+                        const alias = line.slice(idx + 1).trim();
+                        return key ? {key, alias} : null;
+                    }
+                    return {key: line, alias: ''};
+                }).filter(Boolean);
+                if (items.length) grouped[gk] = items;
+            });
+            if (!name || !path) {
+                errBox.textContent = 'Имя и путь обязательны';
+                errBox.classList.add('show'); return false;
+            }
+            try {
+                const url = _apiEntryEditingId
+                    ? `/api/api-balancer/entries/${_apiEntryEditingId}`
+                    : '/api/api-balancer/entries';
+                const method = _apiEntryEditingId ? 'PATCH' : 'POST';
+                const resp = await fetch(url, {
+                    method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, path, search_keys: grouped}),
+                });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    errBox.textContent = data.error || `Ошибка ${resp.status}`;
+                    errBox.classList.add('show');
+                    return false;
+                }
+                closeApiEntryEditor();
+                await loadApiSettings();
+            } catch (err) {
+                errBox.textContent = `Сеть: ${err.message}`;
+                errBox.classList.add('show');
+            }
+            return false;
+        }
+        window.saveApiEntry = saveApiEntry;
+
+        async function deleteApiEntry() {
+            if (!_apiEntryEditingId) return;
+            await deleteApiEntryRow(_apiEntryEditingId, true);
+            closeApiEntryEditor();
+        }
+        window.deleteApiEntry = deleteApiEntry;
+
+        async function deleteApiEntryRow(id, skipConfirm) {
+            if (!skipConfirm) {
+                const cur = _apiEntries.find(x => x.id === id);
+                if (!cur) return;
+                const ok = await confirmModal({
+                    title: `Удалить «${cur.name}»?`,
+                    message: 'Запись будет удалена. nginx-конфиг останется как есть.',
+                    kind: 'danger',
+                    confirmText: 'Удалить',
+                    confirmClass: 'btn-danger',
+                    compact: true,
+                });
+                if (!ok) return;
+            }
+            try {
+                const resp = await fetch(`/api/api-balancer/entries/${id}`, {method: 'DELETE'});
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    toast(data.error || `Ошибка ${resp.status}`, 'err');
+                    return;
+                }
+                await loadApiSettings();
+            } catch (err) {
+                toast(`Сеть: ${err.message}`, 'err');
+            }
+        }
+        window.deleteApiEntryRow = deleteApiEntryRow;
 
         async function loadUsers() {
             const area = document.getElementById('usersArea');

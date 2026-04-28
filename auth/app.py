@@ -35,7 +35,7 @@ except Exception:
 import shlex
 import threading
 import uuid
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -64,6 +64,7 @@ ROUTES = [
     {"key": "db_connection",    "title": "Подключение к БД",     "group": "settings"},
     {"key": "ms_catalog",       "title": "Каталог микросервисов","group": "settings"},
     {"key": "nodes_catalog",    "title": "Каталог нод для микросервисов", "group": "settings"},
+    {"key": "api_settings",     "title": "Настройка API",         "group": "settings"},
     {"key": "balancer_creds",   "title": "Учётки",                 "group": "settings"},
     {"key": "about",            "title": "О программе",          "group": "settings"},
 ]
@@ -321,6 +322,8 @@ def init_db():
     for _c, _ddl in [
         ("log_cutoff_action", "INTEGER NOT NULL DEFAULT 0"),
         ("log_cutoff_error",  "INTEGER NOT NULL DEFAULT 0"),
+        ("progress_done",     "INTEGER NOT NULL DEFAULT 0"),
+        ("progress_total",    "INTEGER NOT NULL DEFAULT 0"),
     ]:
         if _c not in _lock_cols:
             conn.execute(f"ALTER TABLE svc_run_lock ADD COLUMN {_c} {_ddl}")
@@ -340,7 +343,7 @@ def init_db():
             updated_by   TEXT
         )
     """)
-    # Миграция: добавляем поля для stunnel-сервера
+    # Миграция: добавляем поля для stunnel-сервера и внешнего nginx-балансировщика
     _bc_cols = {r[1] for r in conn.execute("PRAGMA table_info(balancer_credentials)").fetchall()}
     for _c, _ddl in [
         ("stunnel_host",     "TEXT NOT NULL DEFAULT ''"),
@@ -348,6 +351,17 @@ def init_db():
         ("stunnel_login",    "TEXT NOT NULL DEFAULT ''"),
         ("stunnel_password", "TEXT NOT NULL DEFAULT ''"),
         ("stunnel_sudo_pwd", "TEXT NOT NULL DEFAULT ''"),
+        ("ext_ssh_host",     "TEXT NOT NULL DEFAULT ''"),
+        ("ext_ssh_port",     "INTEGER NOT NULL DEFAULT 22"),
+        ("ext_ssh_login",    "TEXT NOT NULL DEFAULT ''"),
+        ("ext_ssh_password", "TEXT NOT NULL DEFAULT ''"),
+        ("ext_ssh_sudo_pwd", "TEXT NOT NULL DEFAULT ''"),
+        # Второй stunnel-сервер (nginx BRS); первый стал «nginx SBP» по UI.
+        ("stunnel_brs_host",     "TEXT NOT NULL DEFAULT ''"),
+        ("stunnel_brs_port",     "INTEGER NOT NULL DEFAULT 22"),
+        ("stunnel_brs_login",    "TEXT NOT NULL DEFAULT ''"),
+        ("stunnel_brs_password", "TEXT NOT NULL DEFAULT ''"),
+        ("stunnel_brs_sudo_pwd", "TEXT NOT NULL DEFAULT ''"),
     ]:
         if _c not in _bc_cols:
             conn.execute(f"ALTER TABLE balancer_credentials ADD COLUMN {_c} {_ddl}")
@@ -398,6 +412,22 @@ def init_db():
             position      INTEGER NOT NULL DEFAULT 0,
             created_at    INTEGER NOT NULL,
             updated_at    INTEGER NOT NULL
+        )
+    """)
+    # Миграция: пути внешнего nginx-балансировщика
+    _msc_cols = {r[1] for r in conn.execute("PRAGMA table_info(ms_catalog)").fetchall()}
+    if "balancer_paths_ext" not in _msc_cols:
+        conn.execute("ALTER TABLE ms_catalog ADD COLUMN balancer_paths_ext TEXT NOT NULL DEFAULT '[]'")
+    # Записи API-балансировки (внешний nginx, без Inceptum). Один файл = одна запись.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS api_balancer_entries (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT UNIQUE NOT NULL,
+            path        TEXT NOT NULL,
+            search_keys TEXT NOT NULL DEFAULT '[]',
+            position    INTEGER NOT NULL DEFAULT 0,
+            created_at  INTEGER NOT NULL,
+            updated_at  INTEGER NOT NULL
         )
     """)
     conn.execute("""
@@ -1639,19 +1669,42 @@ def _ssh_connect(host, port, login, password):
 
 
 def _ssh_open(creds):
-    """SSH к балансировщику nginx (использует ssh_* поля)."""
+    """SSH к внутреннему балансировщику nginx (использует ssh_* поля)."""
     if not creds or not creds.get("ssh_host") or not creds.get("ssh_login"):
-        raise BalancerError("SSH-учётка балансировщика не настроена")
+        raise BalancerError("SSH-учётка внутреннего балансировщика не настроена")
     return _ssh_connect(creds["ssh_host"], creds.get("ssh_port"),
                         creds["ssh_login"], creds.get("ssh_password"))
 
 
+def _ext_ssh_open(creds):
+    """SSH к внешнему балансировщику nginx (использует ext_ssh_* поля)."""
+    if not creds or not creds.get("ext_ssh_host") or not creds.get("ext_ssh_login"):
+        raise BalancerError("SSH-учётка внешнего балансировщика не настроена")
+    return _ssh_connect(creds["ext_ssh_host"], creds.get("ext_ssh_port"),
+                        creds["ext_ssh_login"], creds.get("ext_ssh_password"))
+
+
 def _stunnel_ssh_open(creds):
-    """SSH к stunnel-серверу (использует stunnel_* поля)."""
+    """SSH к stunnel «nginx SBP» (использует stunnel_* поля)."""
     if not creds or not creds.get("stunnel_host") or not creds.get("stunnel_login"):
-        raise BalancerError("SSH-учётка stunnel не настроена")
+        raise BalancerError("SSH-учётка stunnel SBP не настроена")
     return _ssh_connect(creds["stunnel_host"], creds.get("stunnel_port"),
                         creds["stunnel_login"], creds.get("stunnel_password"))
+
+
+def _stunnel_brs_ssh_open(creds):
+    """SSH к stunnel «nginx BRS» (использует stunnel_brs_* поля)."""
+    if not creds or not creds.get("stunnel_brs_host") or not creds.get("stunnel_brs_login"):
+        raise BalancerError("SSH-учётка stunnel BRS не настроена")
+    return _ssh_connect(creds["stunnel_brs_host"], creds.get("stunnel_brs_port"),
+                        creds["stunnel_brs_login"], creds.get("stunnel_brs_password"))
+
+
+# Реестр stunnel-серверов: kind → (open_fn, host_field, sudo_field)
+STUNNEL_KINDS = {
+    "sbp": (_stunnel_ssh_open,     "stunnel_host",     "stunnel_sudo_pwd",     "nginx SBP"),
+    "brs": (_stunnel_brs_ssh_open, "stunnel_brs_host", "stunnel_brs_sudo_pwd", "nginx BRS"),
+}
 
 
 def _filter_shell_noise(text):
@@ -1812,7 +1865,7 @@ def svc_test_balancer():
     if err: return err
     creds = get_balancer_creds()
     if not creds or not creds.get("ssh_host"):
-        return jsonify({"ok": False, "error": "SSH-учётка балансировщика не настроена"}), 400
+        return jsonify({"ok": False, "error": "SSH-учётка внутреннего балансировщика не настроена"}), 400
     try:
         client = _ssh_open(creds)
     except BalancerError as e:
@@ -1820,6 +1873,27 @@ def svc_test_balancer():
     try:
         out = _nginx_test(client, creds.get("ssh_sudo_pwd") or "")
         return jsonify({"ok": True, "output": out, "host": creds["ssh_host"]})
+    except BalancerError as e:
+        return jsonify({"ok": False, "error": str(e)}), 502
+    finally:
+        try: client.close()
+        except Exception: pass
+
+
+@app.post("/api/svc/test-ext-balancer")
+def svc_test_ext_balancer():
+    _, err = require_route("balancer_creds")
+    if err: return err
+    creds = get_balancer_creds()
+    if not creds or not creds.get("ext_ssh_host"):
+        return jsonify({"ok": False, "error": "SSH-учётка внешнего балансировщика не настроена"}), 400
+    try:
+        client = _ext_ssh_open(creds)
+    except BalancerError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    try:
+        out = _nginx_test(client, creds.get("ext_ssh_sudo_pwd") or "")
+        return jsonify({"ok": True, "output": out, "host": creds["ext_ssh_host"]})
     except BalancerError as e:
         return jsonify({"ok": False, "error": str(e)}), 502
     finally:
@@ -1869,33 +1943,47 @@ def svc_test_ntlm():
         return jsonify({"ok": True, "host": host, "output": "OK (ответ не JSON)"})
 
 
-@app.post("/api/svc/test-stunnel")
-def svc_test_stunnel():
-    """Тест SSH-учётки stunnel-сервера: подключаемся, выполняем whoami+hostname."""
-    _, err = require_route("balancer_creds")
-    if err: return err
+def _do_test_stunnel(kind):
+    if kind not in STUNNEL_KINDS:
+        return jsonify({"ok": False, "error": "Неизвестный stunnel"}), 400
+    open_fn, host_field, _, label = STUNNEL_KINDS[kind]
     creds = get_balancer_creds()
-    if not creds or not creds.get("stunnel_host"):
-        return jsonify({"ok": False, "error": "stunnel SSH-учётка не настроена"}), 400
+    if not creds or not creds.get(host_field):
+        return jsonify({"ok": False, "error": f"stunnel SSH-учётка «{label}» не настроена"}), 400
     try:
-        client = _stunnel_ssh_open(creds)
+        client = open_fn(creds)
     except BalancerError as e:
         return jsonify({"ok": False, "error": str(e)}), 502
     try:
         rc, out, err_o = _ssh_run(client, "whoami && hostname")
         if rc != 0:
             return jsonify({"ok": False, "error": (err_o or out).strip() or f"exit={rc}"}), 502
-        # Также проверим, что systemctl видно (без sudo, просто is-active)
         rc2, out2, _ = _ssh_run(client, f"systemctl is-active {STUNNEL_SERVICE_NAME} 2>/dev/null || true")
         active_now = (out2 or "").strip() or "?"
         return jsonify({
             "ok": True,
-            "host": creds["stunnel_host"],
+            "host": creds[host_field],
             "output": f"{out.strip()}\nstunnel сейчас: {active_now}",
         })
     finally:
         try: client.close()
         except Exception: pass
+
+
+@app.post("/api/svc/test-stunnel")
+def svc_test_stunnel():
+    """Тест stunnel «nginx SBP» (legacy-роут, по умолчанию SBP)."""
+    _, err = require_route("balancer_creds")
+    if err: return err
+    return _do_test_stunnel("sbp")
+
+
+@app.post("/api/svc/test-stunnel-brs")
+def svc_test_stunnel_brs():
+    """Тест stunnel «nginx BRS»."""
+    _, err = require_route("balancer_creds")
+    if err: return err
+    return _do_test_stunnel("brs")
 
 
 # ===== Stunnel: статус и управление =====
@@ -1905,47 +1993,47 @@ def _stunnel_run(client, sudo_pwd, cmd, timeout=SSH_TIMEOUT_CMD):
     return _ssh_run_sudo(client, sudo_pwd, cmd, timeout=timeout)
 
 
-@app.get("/api/stunnel/status")
-def stunnel_status():
-    _, err = require_route("stunnel")
-    if err: return err
+def _do_stunnel_status(kind):
+    if kind not in STUNNEL_KINDS:
+        return jsonify({"error": "Неизвестный stunnel"}), 400
+    open_fn, host_field, sudo_field, label = STUNNEL_KINDS[kind]
     creds = get_balancer_creds()
-    if not creds or not creds.get("stunnel_host"):
-        return jsonify({"error": "stunnel-сервер не настроен в учётках"}), 400
+    if not creds or not creds.get(host_field):
+        return jsonify({"error": f"stunnel «{label}» не настроен в учётках"}), 400
     try:
-        client = _stunnel_ssh_open(creds)
+        client = open_fn(creds)
     except BalancerError as e:
         return jsonify({"error": str(e)}), 502
     try:
-        sudo_pwd = creds.get("stunnel_sudo_pwd") or ""
-        rc1, out_active, err_active = _stunnel_run(
+        sudo_pwd = creds.get(sudo_field) or ""
+        _, out_active, err_active = _stunnel_run(
             client, sudo_pwd, f"systemctl is-active {STUNNEL_SERVICE_NAME}"
         )
-        is_active = (out_active or err_active or "").strip() or "unknown"
         return jsonify({
-            "host": creds["stunnel_host"],
-            "is_active": is_active,
+            "host": creds[host_field],
+            "label": label,
+            "is_active": (out_active or err_active or "").strip() or "unknown",
         })
     finally:
         try: client.close()
         except Exception: pass
 
 
-@app.post("/api/stunnel/<action>")
-def stunnel_action(action):
+def _do_stunnel_action(kind, action):
     if action not in ("start", "stop", "restart"):
         return jsonify({"error": "Неизвестное действие"}), 400
-    u, err = require_route("stunnel")
-    if err: return err
+    if kind not in STUNNEL_KINDS:
+        return jsonify({"error": "Неизвестный stunnel"}), 400
+    open_fn, host_field, sudo_field, label = STUNNEL_KINDS[kind]
     creds = get_balancer_creds()
-    if not creds or not creds.get("stunnel_host"):
-        return jsonify({"error": "stunnel-сервер не настроен в учётках"}), 400
+    if not creds or not creds.get(host_field):
+        return jsonify({"error": f"stunnel «{label}» не настроен в учётках"}), 400
     try:
-        client = _stunnel_ssh_open(creds)
+        client = open_fn(creds)
     except BalancerError as e:
         return jsonify({"error": str(e)}), 502
     try:
-        sudo_pwd = creds.get("stunnel_sudo_pwd") or ""
+        sudo_pwd = creds.get(sudo_field) or ""
         rc, out, err_o = _stunnel_run(
             client, sudo_pwd,
             f"systemctl {action} {STUNNEL_SERVICE_NAME}",
@@ -1956,7 +2044,6 @@ def stunnel_action(action):
                 "ok": False,
                 "error": (err_o or out).strip() or f"exit={rc}",
             }), 502
-        # Возвращаем актуальный статус
         _, out_active, err_active = _stunnel_run(
             client, sudo_pwd, f"systemctl is-active {STUNNEL_SERVICE_NAME}"
         )
@@ -1968,6 +2055,34 @@ def stunnel_action(action):
     finally:
         try: client.close()
         except Exception: pass
+
+
+@app.get("/api/stunnel/status")
+def stunnel_status():
+    _, err = require_route("stunnel")
+    if err: return err
+    return _do_stunnel_status("sbp")
+
+
+@app.get("/api/stunnel-brs/status")
+def stunnel_brs_status():
+    _, err = require_route("stunnel")
+    if err: return err
+    return _do_stunnel_status("brs")
+
+
+@app.post("/api/stunnel/<action>")
+def stunnel_action(action):
+    u, err = require_route("stunnel")
+    if err: return err
+    return _do_stunnel_action("sbp", action)
+
+
+@app.post("/api/stunnel-brs/<action>")
+def stunnel_brs_action(action):
+    u, err = require_route("stunnel")
+    if err: return err
+    return _do_stunnel_action("brs", action)
 
 
 def _ms_query_status(host, service, user=None, pwd=None):
@@ -2433,12 +2548,18 @@ def _serialize_catalog_row(row, nodes):
         paths = json.loads(row["balancer_paths"] or "[]")
     except Exception:
         paths = []
+    try:
+        paths_ext = json.loads(row["balancer_paths_ext"] or "[]")
+    except Exception:
+        paths_ext = []
     return {
         "id": row["id"],
         "name": row["name"],
         "paths": paths,
+        "paths_ext": paths_ext,
         "nodes": nodes,
         "balanced": bool(paths),
+        "balanced_ext": bool(paths_ext),
     }
 
 
@@ -2449,7 +2570,7 @@ def ms_catalog_list():
     _, err = require_route("Balancer")
     if err: return err
     rows = db().execute(
-        "SELECT id, name, balancer_paths, position FROM ms_catalog "
+        "SELECT id, name, balancer_paths, balancer_paths_ext, position FROM ms_catalog "
         "ORDER BY position, name"
     ).fetchall()
     nodes_by_id = {}
@@ -2467,15 +2588,22 @@ def ms_catalog_create():
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
     paths = data.get("paths") or []
+    paths_ext = data.get("paths_ext") or []
     nodes = data.get("nodes") or []
     if not MS_CATALOG_NAME_RE.match(name):
         return jsonify({"error": "Имя: латиница, цифры, точка, дефис, подчёркивание (до 128 символов)"}), 400
     if not isinstance(paths, list) or not all(isinstance(p, str) for p in paths):
         return jsonify({"error": "paths должен быть списком строк"}), 400
+    if not isinstance(paths_ext, list) or not all(isinstance(p, str) for p in paths_ext):
+        return jsonify({"error": "paths_ext должен быть списком строк"}), 400
     paths = [p.strip() for p in paths if p.strip()]
+    paths_ext = [p.strip() for p in paths_ext if p.strip()]
     for p in paths:
         if not MS_PATH_RE.match(p):
-            return jsonify({"error": f"Недопустимый путь: {p}"}), 400
+            return jsonify({"error": f"Недопустимый путь (внутр.): {p}"}), 400
+    for p in paths_ext:
+        if not MS_PATH_RE.match(p):
+            return jsonify({"error": f"Недопустимый путь (внеш.): {p}"}), 400
     if not isinstance(nodes, list):
         return jsonify({"error": "nodes должен быть списком"}), 400
     nodes = [str(n).strip() for n in nodes if MS_NODE_KEY_RE.match(str(n).strip())]
@@ -2486,9 +2614,9 @@ def ms_catalog_create():
     pos = pos_row[0] if pos_row else 0
     now = int(time.time())
     cur = conn.execute(
-        "INSERT INTO ms_catalog (name, balancer_paths, position, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (name, json.dumps(paths), pos, now, now),
+        "INSERT INTO ms_catalog (name, balancer_paths, balancer_paths_ext, position, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (name, json.dumps(paths), json.dumps(paths_ext), pos, now, now),
     )
     cid = cur.lastrowid
     for n in nodes:
@@ -2526,8 +2654,17 @@ def ms_catalog_update(cid):
         paths = [p.strip() for p in paths if p.strip()]
         for p in paths:
             if not MS_PATH_RE.match(p):
-                return jsonify({"error": f"Недопустимый путь: {p}"}), 400
+                return jsonify({"error": f"Недопустимый путь (внутр.): {p}"}), 400
         fields.append("balancer_paths = ?"); args.append(json.dumps(paths))
+    if "paths_ext" in data:
+        paths_ext = data.get("paths_ext") or []
+        if not isinstance(paths_ext, list) or not all(isinstance(p, str) for p in paths_ext):
+            return jsonify({"error": "paths_ext должен быть списком строк"}), 400
+        paths_ext = [p.strip() for p in paths_ext if p.strip()]
+        for p in paths_ext:
+            if not MS_PATH_RE.match(p):
+                return jsonify({"error": f"Недопустимый путь (внеш.): {p}"}), 400
+        fields.append("balancer_paths_ext = ?"); args.append(json.dumps(paths_ext))
     if fields:
         fields.append("updated_at = ?"); args.append(int(time.time()))
         args.append(cid)
@@ -2560,6 +2697,289 @@ def ms_catalog_delete(cid):
     return jsonify({"ok": True})
 
 
+# ===== API-балансировка: записи (внешний nginx, без Inceptum) =====
+API_ENTRY_NAME_RE = re.compile(r"^[A-Za-zА-Яа-яЁё0-9 ._\-]{1,128}$")
+API_ENTRY_KEY_RE  = re.compile(r"^[A-Za-z0-9._\-]{1,64}$")
+
+
+def _api_keys_parse(raw):
+    """Из значения колонки search_keys → словарь {group_key: [{key, alias}, ...]}.
+    Поддерживает три исторических варианта хранения:
+      - list[str]       (старый-старый: «без плеча», без алиасов)
+      - dict[gk: list[str]]            («плечи», без алиасов)
+      - dict[gk: list[{key, alias}]]   (текущий формат)
+    """
+    try:
+        v = json.loads(raw or "{}")
+    except Exception:
+        return {}
+
+    def _norm_one(item):
+        if isinstance(item, str):
+            s = item.strip()
+            return {"key": s, "alias": ""} if s else None
+        if isinstance(item, dict):
+            k = str(item.get("key") or "").strip()
+            a = str(item.get("alias") or "").strip()
+            return {"key": k, "alias": a} if k else None
+        return None
+
+    if isinstance(v, list):
+        items = [x for x in (_norm_one(it) for it in v) if x]
+        return {"": items} if items else {}
+    if isinstance(v, dict):
+        out = {}
+        for gk, items in v.items():
+            if not isinstance(items, list): continue
+            cleaned = [x for x in (_norm_one(it) for it in items) if x]
+            if cleaned:
+                out[str(gk)] = cleaned
+        return out
+    return {}
+
+
+def _api_keys_flatten_keys(grouped):
+    """Плоский список одних только key-строк (для оркестратора/ротации)."""
+    flat = []
+    for gk in sorted(grouped.keys(), key=lambda x: (x == "", x)):
+        for it in grouped[gk]:
+            flat.append(it["key"])
+    return flat
+
+
+def _api_entry_serialize(row):
+    grouped = _api_keys_parse(row["search_keys"])
+    return {
+        "id":   row["id"],
+        "name": row["name"],
+        "path": row["path"],
+        # search_keys — плоский список самих ключей (для совместимости)
+        "search_keys": _api_keys_flatten_keys(grouped),
+        # search_keys_grouped — словарь плечо → [{key, alias}, ...]
+        "search_keys_grouped": grouped,
+        "position":    row["position"],
+    }
+
+
+@app.get("/api/api-balancer/entries")
+def api_balancer_list():
+    # Чтение доступно тем, у кого есть Balancer (т.к. вкладка API там же).
+    _, err = require_route("Balancer")
+    if err: return err
+    rows = db().execute(
+        "SELECT id, name, path, search_keys, position "
+        "FROM api_balancer_entries ORDER BY position, name"
+    ).fetchall()
+    return jsonify({"entries": [_api_entry_serialize(r) for r in rows]})
+
+
+API_ENTRY_ALIAS_RE = re.compile(r"^.{0,64}$")  # алиас — любой текст до 64 символов
+
+
+def _api_keys_validate(value, conn):
+    """Принимает dict {group_key: list[str|{key, alias}]} или legacy list.
+    Возвращает (grouped, error_str), где grouped — каноничный
+    {group_key: [{key, alias}, ...]}."""
+    def _coerce_item(it):
+        if isinstance(it, str):
+            return it.strip(), ""
+        if isinstance(it, dict):
+            return str(it.get("key") or "").strip(), str(it.get("alias") or "").strip()
+        return None, None
+
+    if isinstance(value, list):
+        items = []
+        for it in value:
+            k, a = _coerce_item(it)
+            if k is None: continue
+            if not k: continue
+            if not API_ENTRY_KEY_RE.match(k):
+                return None, f"Недопустимый ключ поиска: {k}"
+            if a and not API_ENTRY_ALIAS_RE.match(a):
+                return None, f"Недопустимый алиас: {a}"
+            items.append({"key": k, "alias": a})
+        return ({"": items} if items else {}), None
+    if not isinstance(value, dict):
+        return None, "search_keys должен быть списком или объектом {плечо: [ключи]}"
+    valid_groups = {r[0] for r in conn.execute("SELECT group_key FROM ms_groups").fetchall()}
+    valid_groups.add("")  # пустой = «без плеча»
+    grouped = {}
+    for gk, items in value.items():
+        gk = str(gk)
+        if gk not in valid_groups:
+            return None, f"Неизвестное плечо: «{gk}»"
+        if not isinstance(items, list):
+            return None, f"Ключи плеча «{gk}» должны быть списком"
+        cleaned = []
+        for it in items:
+            k, a = _coerce_item(it)
+            if k is None: continue
+            if not k: continue
+            if not API_ENTRY_KEY_RE.match(k):
+                return None, f"Недопустимый ключ поиска: {k}"
+            if a and not API_ENTRY_ALIAS_RE.match(a):
+                return None, f"Недопустимый алиас: {a}"
+            cleaned.append({"key": k, "alias": a})
+        if cleaned:
+            grouped[gk] = cleaned
+    return grouped, None
+
+
+@app.post("/api/api-balancer/entries")
+def api_balancer_create():
+    _, err = require_route("api_settings")
+    if err: return err
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    path = (data.get("path") or "").strip()
+    if not API_ENTRY_NAME_RE.match(name):
+        return jsonify({"error": "Имя: 1..128 символов, латиница/кириллица, цифры, пробел, точка, дефис, подчёркивание"}), 400
+    if not MS_PATH_RE.match(path):
+        return jsonify({"error": "Недопустимый путь nginx-конфига"}), 400
+    conn = db()
+    grouped, err_msg = _api_keys_validate(data.get("search_keys") or {}, conn)
+    if err_msg:
+        return jsonify({"error": err_msg}), 400
+    if conn.execute("SELECT 1 FROM api_balancer_entries WHERE name = ?", (name,)).fetchone():
+        return jsonify({"error": f"Запись «{name}» уже существует"}), 409
+    pos_row = conn.execute("SELECT COALESCE(MAX(position), -1) + 1 FROM api_balancer_entries").fetchone()
+    pos = pos_row[0] if pos_row else 0
+    now = int(time.time())
+    cur = conn.execute(
+        "INSERT INTO api_balancer_entries (name, path, search_keys, position, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (name, path, json.dumps(grouped), pos, now, now),
+    )
+    conn.commit()
+    return jsonify({"ok": True, "id": cur.lastrowid})
+
+
+@app.patch("/api/api-balancer/entries/<int:eid>")
+def api_balancer_update(eid):
+    _, err = require_route("api_settings")
+    if err: return err
+    data = request.get_json(silent=True) or {}
+    conn = db()
+    row = conn.execute("SELECT id, name FROM api_balancer_entries WHERE id = ?", (eid,)).fetchone()
+    if not row:
+        return jsonify({"error": "Не найдено"}), 404
+    fields = []
+    args = []
+    if "name" in data:
+        name = (data.get("name") or "").strip()
+        if not API_ENTRY_NAME_RE.match(name):
+            return jsonify({"error": "Имя: 1..128 символов, латиница/кириллица, цифры, пробел, точка, дефис, подчёркивание"}), 400
+        if name != row["name"] and conn.execute(
+                "SELECT 1 FROM api_balancer_entries WHERE name = ? AND id <> ?",
+                (name, eid)).fetchone():
+            return jsonify({"error": f"Запись «{name}» уже существует"}), 409
+        fields.append("name = ?"); args.append(name)
+    if "path" in data:
+        path = (data.get("path") or "").strip()
+        if not MS_PATH_RE.match(path):
+            return jsonify({"error": "Недопустимый путь nginx-конфига"}), 400
+        fields.append("path = ?"); args.append(path)
+    if "search_keys" in data:
+        grouped, err_msg = _api_keys_validate(data.get("search_keys") or {}, conn)
+        if err_msg:
+            return jsonify({"error": err_msg}), 400
+        fields.append("search_keys = ?"); args.append(json.dumps(grouped))
+    if not fields:
+        return jsonify({"ok": True, "noop": True})
+    fields.append("updated_at = ?"); args.append(int(time.time()))
+    args.append(eid)
+    conn.execute(f"UPDATE api_balancer_entries SET {', '.join(fields)} WHERE id = ?", args)
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.delete("/api/api-balancer/entries/<int:eid>")
+def api_balancer_delete(eid):
+    _, err = require_route("api_settings")
+    if err: return err
+    conn = db()
+    res = conn.execute("DELETE FROM api_balancer_entries WHERE id = ?", (eid,))
+    if res.rowcount == 0:
+        return jsonify({"error": "Не найдено"}), 404
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/api-balancer/rotation")
+def api_balancer_rotation():
+    """Реальное состояние «в ротации» по API-записям, на ВНЕШНЕМ nginx.
+    body: {entry_ids?: [id, ...]} — если пусто, опрашиваются все записи.
+    Возвращает: {results: {entry_id: {key: True/False/null}}, paths: {entry_id: path}}.
+    """
+    _, err = require_route("Balancer")
+    if err: return err
+    data = request.get_json(silent=True) or {}
+    requested = data.get("entry_ids")
+    rows = db().execute(
+        "SELECT id, name, path, search_keys FROM api_balancer_entries ORDER BY position, name"
+    ).fetchall()
+    if isinstance(requested, list) and requested:
+        wanted = {int(x) for x in requested if isinstance(x, int) or (isinstance(x, str) and x.isdigit())}
+        rows = [r for r in rows if r["id"] in wanted]
+    if not rows:
+        return jsonify({"results": {}, "paths": {}})
+
+    creds = get_balancer_creds()
+    if not creds or not creds.get("ext_ssh_host"):
+        return jsonify({"error": "SSH внешнего балансировщика не настроен"}), 400
+    try:
+        ssh = _ext_ssh_open(creds)
+    except BalancerError as e:
+        return jsonify({"error": str(e)}), 502
+    sudo = creds.get("ext_ssh_sudo_pwd") or ""
+
+    file_cache = {}
+    def get_first_lines(path):
+        if path in file_cache: return file_cache[path]
+        rc, content, _err = _ssh_run_sudo(ssh, sudo,
+                                          f"head -n {NGINX_SEARCH_LINES} {shlex.quote(path)}")
+        if rc != 0:
+            file_cache[path] = None
+            return None
+        file_cache[path] = content.split("\n")[:NGINX_SEARCH_LINES]
+        return file_cache[path]
+
+    results = {}
+    paths_out = {}
+    try:
+        for r in rows:
+            keys = _api_keys_flatten_keys(_api_keys_parse(r["search_keys"]))
+            paths_out[str(r["id"])] = r["path"]
+            results[str(r["id"])] = {}
+            lines = get_first_lines(r["path"])
+            for k in keys:
+                if not lines:
+                    results[str(r["id"])][k] = None
+                    continue
+                stripped = k.lower()
+                rgx = re.compile(r"\b" + re.escape(stripped) + r"\b", re.IGNORECASE)
+                found_un = False
+                found_co = False
+                for ln in lines:
+                    if rgx.search(ln):
+                        if ln.lstrip().startswith("#"):
+                            found_co = True
+                        else:
+                            found_un = True
+                        break
+                if found_un:
+                    results[str(r["id"])][k] = True
+                elif found_co:
+                    results[str(r["id"])][k] = False
+                else:
+                    results[str(r["id"])][k] = None
+    finally:
+        try: ssh.close()
+        except Exception: pass
+
+    return jsonify({"results": results, "paths": paths_out})
+
+
 # ===== Учётки для балансировки =====
 @app.get("/api/balancer-credentials")
 def balancer_creds_get():
@@ -2574,6 +2994,11 @@ def balancer_creds_get():
         "ssh_login":   row["ssh_login"]  or "",
         "ssh_password_set": bool(row["ssh_password"]),
         "ssh_sudo_pwd_set": bool(row["ssh_sudo_pwd"]),
+        "ext_ssh_host":    row["ext_ssh_host"]   or "",
+        "ext_ssh_port":    row["ext_ssh_port"]   or 22,
+        "ext_ssh_login":   row["ext_ssh_login"]  or "",
+        "ext_ssh_password_set": bool(row["ext_ssh_password"]),
+        "ext_ssh_sudo_pwd_set": bool(row["ext_ssh_sudo_pwd"]),
         "win_login":   row["win_login"]  or "",
         "win_password_set": bool(row["win_password"]),
         "stunnel_host":    row["stunnel_host"]   or "",
@@ -2581,6 +3006,11 @@ def balancer_creds_get():
         "stunnel_login":   row["stunnel_login"]  or "",
         "stunnel_password_set": bool(row["stunnel_password"]),
         "stunnel_sudo_pwd_set": bool(row["stunnel_sudo_pwd"]),
+        "stunnel_brs_host":    row["stunnel_brs_host"]   or "",
+        "stunnel_brs_port":    row["stunnel_brs_port"]   or 22,
+        "stunnel_brs_login":   row["stunnel_brs_login"]  or "",
+        "stunnel_brs_password_set": bool(row["stunnel_brs_password"]),
+        "stunnel_brs_sudo_pwd_set": bool(row["stunnel_brs_sudo_pwd"]),
         "updated_at":  row["updated_at"] or 0,
         "updated_by":  row["updated_by"] or "",
     })
@@ -2606,6 +3036,14 @@ def balancer_creds_set():
             return jsonify({"error": "ssh_port должен быть числом 1..65535"}), 400
         upd("ssh_port", p)
     if "ssh_login" in data:   upd("ssh_login", (data["ssh_login"] or "").strip())
+    if "ext_ssh_host" in data:  upd("ext_ssh_host",  (data["ext_ssh_host"] or "").strip())
+    if "ext_ssh_login" in data: upd("ext_ssh_login", (data["ext_ssh_login"] or "").strip())
+    if "ext_ssh_port" in data:
+        try:
+            ep = int(data["ext_ssh_port"]); assert 1 <= ep <= 65535
+        except Exception:
+            return jsonify({"error": "ext_ssh_port должен быть числом 1..65535"}), 400
+        upd("ext_ssh_port", ep)
     if "win_login" in data:   upd("win_login", (data["win_login"] or "").strip())
     if "stunnel_host" in data:  upd("stunnel_host",  (data["stunnel_host"] or "").strip())
     if "stunnel_login" in data: upd("stunnel_login", (data["stunnel_login"] or "").strip())
@@ -2615,10 +3053,21 @@ def balancer_creds_set():
         except Exception:
             return jsonify({"error": "stunnel_port должен быть числом 1..65535"}), 400
         upd("stunnel_port", sp)
+    if "stunnel_brs_host" in data:  upd("stunnel_brs_host",  (data["stunnel_brs_host"] or "").strip())
+    if "stunnel_brs_login" in data: upd("stunnel_brs_login", (data["stunnel_brs_login"] or "").strip())
+    if "stunnel_brs_port" in data:
+        try:
+            sbp = int(data["stunnel_brs_port"]); assert 1 <= sbp <= 65535
+        except Exception:
+            return jsonify({"error": "stunnel_brs_port должен быть числом 1..65535"}), 400
+        upd("stunnel_brs_port", sbp)
     # Пароли: если поле прислано пустой строкой — оставляем как есть (не затираем).
     # Если непустое — шифруем и пишем.
-    for fld in ("ssh_password", "ssh_sudo_pwd", "win_password",
-                "stunnel_password", "stunnel_sudo_pwd"):
+    for fld in ("ssh_password", "ssh_sudo_pwd",
+                "ext_ssh_password", "ext_ssh_sudo_pwd",
+                "win_password",
+                "stunnel_password", "stunnel_sudo_pwd",
+                "stunnel_brs_password", "stunnel_brs_sudo_pwd"):
         if fld in data and (data[fld] or "") != "":
             upd(fld, encrypt_secret(data[fld]))
     if not fields:
@@ -2681,6 +3130,11 @@ def get_balancer_creds():
         "ssh_login":    row["ssh_login"]  or "",
         "ssh_password": decrypt_secret(row["ssh_password"]),
         "ssh_sudo_pwd": decrypt_secret(row["ssh_sudo_pwd"]),
+        "ext_ssh_host":     row["ext_ssh_host"]   or "",
+        "ext_ssh_port":     row["ext_ssh_port"]   or 22,
+        "ext_ssh_login":    row["ext_ssh_login"]  or "",
+        "ext_ssh_password": decrypt_secret(row["ext_ssh_password"]),
+        "ext_ssh_sudo_pwd": decrypt_secret(row["ext_ssh_sudo_pwd"]),
         "win_login":    row["win_login"]  or "",
         "win_password": decrypt_secret(row["win_password"]),
         "stunnel_host":     row["stunnel_host"]   or "",
@@ -2688,6 +3142,11 @@ def get_balancer_creds():
         "stunnel_login":    row["stunnel_login"]  or "",
         "stunnel_password": decrypt_secret(row["stunnel_password"]),
         "stunnel_sudo_pwd": decrypt_secret(row["stunnel_sudo_pwd"]),
+        "stunnel_brs_host":     row["stunnel_brs_host"]   or "",
+        "stunnel_brs_port":     row["stunnel_brs_port"]   or 22,
+        "stunnel_brs_login":    row["stunnel_brs_login"]  or "",
+        "stunnel_brs_password": decrypt_secret(row["stunnel_brs_password"]),
+        "stunnel_brs_sudo_pwd": decrypt_secret(row["stunnel_brs_sudo_pwd"]),
     }
 
 
@@ -2765,7 +3224,7 @@ INCEPTUM_POLL_INTERVAL = 3       # секунды между опросами /a
 INCEPTUM_BALANCE_WAIT  = 60      # пауза для разбалансировки nginx между шагами
 INCEPTUM_HANG_WARN_SEC = 60      # через сколько начинаем писать «зависло»
 INCEPTUM_STOP_WAIT      = 90     # ждём Stopped после Stop, потом Kill
-INCEPTUM_KILL_WAIT      = 15     # ждём Stopped после Kill
+INCEPTUM_KILL_WAIT      = 90     # ждём Stopped после Kill
 INCEPTUM_START_WAIT     = 90     # ждём Started после Start (на одну попытку)
 INCEPTUM_TIMEOUT_ACTION = 120    # HTTP read-timeout для POST Stop/Start/Kill
 
@@ -2820,7 +3279,8 @@ def _orch_acquire(action, username):
         conn.execute(
             "UPDATE svc_run_lock SET run_id=?, username=?, action=?, "
             "started_at=?, stopped_at=NULL, cancel_requested=0, "
-            "log_cutoff_action=?, log_cutoff_error=? WHERE id=1",
+            "log_cutoff_action=?, log_cutoff_error=?, "
+            "progress_done=0, progress_total=0 WHERE id=1",
             (run_id, username, action, int(time.time()), cut_action, cut_error),
         )
         conn.commit()
@@ -2847,7 +3307,15 @@ def _orch_state():
     conn.row_factory = sqlite3.Row
     try:
         row = conn.execute("SELECT * FROM svc_run_lock WHERE id = 1").fetchone()
-        if row and row["run_id"]:
+        if not row:
+            return {"busy": False, "log_cutoff_action": 0, "log_cutoff_error": 0}
+        common = {
+            # Эти отсечки нужны фронту даже после завершения прогона,
+            # чтобы не подтягивать в UI логи предыдущих операций.
+            "log_cutoff_action": row["log_cutoff_action"] or 0,
+            "log_cutoff_error":  row["log_cutoff_error"]  or 0,
+        }
+        if row["run_id"]:
             return {
                 "busy": True,
                 "run_id": row["run_id"],
@@ -2855,12 +3323,49 @@ def _orch_state():
                 "action": row["action"],
                 "started_at": row["started_at"],
                 "cancel_requested": bool(row["cancel_requested"]),
-                "log_cutoff_action": row["log_cutoff_action"] or 0,
-                "log_cutoff_error":  row["log_cutoff_error"]  or 0,
+                "progress_done":     row["progress_done"]  or 0,
+                "progress_total":    row["progress_total"] or 0,
+                **common,
             }
-        return {"busy": False}
+        return {"busy": False, **common}
     finally:
         conn.close()
+
+
+def _orch_progress_set_total(run_id, total):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        try:
+            conn.execute(
+                "UPDATE svc_run_lock SET progress_total=?, progress_done=0 "
+                "WHERE id=1 AND run_id=?",
+                (int(total), run_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        app.logger.exception("progress_set_total failed")
+
+
+def _orch_progress_inc(run_id, n=1):
+    if n <= 0:
+        return
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        try:
+            conn.execute(
+                "UPDATE svc_run_lock "
+                "SET progress_done = MIN(COALESCE(progress_done,0) + ?, "
+                "                        COALESCE(progress_total,0)) "
+                "WHERE id=1 AND run_id=?",
+                (int(n), run_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        app.logger.exception("progress_inc failed")
 
 
 def _orch_request_cancel(run_id):
@@ -2966,7 +3471,8 @@ def _inceptum_wait_status(host, app_name, target, auth, run_id, label, deadline_
 def _orch_load_context(pairs):
     """По списку (host_key, service_name) собирает справочную инфу из БД:
        - nodes_map: {key: {group, host, role}}
-       - svc_paths: {service_name: [paths]}
+       - svc_paths_int: {service_name: [paths]} — пути внутреннего балансера
+       - svc_paths_ext: {service_name: [paths]} — пути внешнего балансера
        - groups:    [{key, title, position}] в порядке.
     """
     conn = sqlite3.connect(DB_PATH)
@@ -2986,18 +3492,20 @@ def _orch_load_context(pairs):
         if svc_names:
             ph2 = ",".join(["?"] * len(svc_names))
             rows = conn.execute(
-                f"SELECT name, balancer_paths FROM ms_catalog WHERE name IN ({ph2})",
+                f"SELECT name, balancer_paths, balancer_paths_ext FROM ms_catalog WHERE name IN ({ph2})",
                 svc_names,
             ).fetchall()
-            svc_paths = {r["name"]: json.loads(r["balancer_paths"] or "[]") for r in rows}
+            svc_paths_int = {r["name"]: json.loads(r["balancer_paths"]     or "[]") for r in rows}
+            svc_paths_ext = {r["name"]: json.loads(r["balancer_paths_ext"] or "[]") for r in rows}
         else:
-            svc_paths = {}
+            svc_paths_int = {}
+            svc_paths_ext = {}
         groups = [dict(r) for r in conn.execute(
             "SELECT group_key, title, position FROM ms_groups ORDER BY position, group_key"
         ).fetchall()]
     finally:
         conn.close()
-    return nodes_map, svc_paths, groups
+    return nodes_map, svc_paths_int, svc_paths_ext, groups
 
 
 def _orch_group_pairs(pairs, nodes_map):
@@ -3052,26 +3560,37 @@ def _orch_rollback_files(client, sudo_pwd, backups, run_id, plecho_title):
                     run_id)
 
 
-def _orch_apply_balancing(entries, svc_paths, ssh, sudo_pwd, run_id, plecho_title, direction):
-    """Drain или Return для всех (host, svc) этого плеча.
+_DIR_RU = {"drain": "вывод из ротации", "return": "ввод в ротацию"}
+
+
+def _orch_apply_balancing(entries, svc_paths, ssh, sudo_pwd, run_id,
+                          plecho_title, direction, bal_tag="int"):
+    """Drain/Return для всех (host, svc) этого плеча на ОДНОМ балансере.
+    bal_tag: "int" или "ext" — попадает в префикс логов.
     Группирует по path (одна правка файла за всех нод сразу).
-    Возвращает True (что-то изменилось), False (всё уже было), None (ошибка)."""
-    try:
-        _nginx_test(ssh, sudo_pwd)
-    except BalancerError as e:
-        svc_log("error", "err", f"[{plecho_title}] {e}\nSTOP", run_id)
-        return None
+    Возвращает True (что-то изменилось), False (всё уже было), None (ошибка).
+    Если на этом балансере для всех сервисов в entries нет путей — возвращает False
+    (no-op), без ошибки и без вызова nginx -t."""
+    pre = f"[{bal_tag}][{plecho_title}]"
+    dir_ru = _DIR_RU.get(direction, direction)
 
     path_to_keys = {}
     for e in entries:
         paths = svc_paths.get(e["service"], [])
         if not paths:
-            svc_log("action", "info",
-                    f"[{plecho_title}] {e['host_key']} :: {e['service']} — не балансируется, пропускаю {direction}",
-                    run_id)
             continue
         for p in paths:
             path_to_keys.setdefault(p, set()).add(e["host_key"])
+
+    if not path_to_keys:
+        # Балансер не задействован для этой группы — тихо выходим.
+        return False
+
+    try:
+        _nginx_test(ssh, sudo_pwd)
+    except BalancerError as e:
+        svc_log("error", "err", f"{pre} {e}\nSTOP", run_id)
+        return None
 
     backups = {}   # path -> original content (для отката, если что-то упадёт)
     any_changed = False
@@ -3080,18 +3599,18 @@ def _orch_apply_balancing(entries, svc_paths, ssh, sudo_pwd, run_id, plecho_titl
         try:
             res = _balancer_apply(ssh, sudo_pwd, path, keys, direction)
         except BalancerError as e:
-            svc_log("error", "err", f"[{plecho_title}] {direction} {path}: {e}\nSTOP", run_id)
-            _orch_rollback_files(ssh, sudo_pwd, backups, run_id, plecho_title)
+            svc_log("error", "err", f"{pre} {dir_ru} {path}: {e}\nSTOP", run_id)
+            _orch_rollback_files(ssh, sudo_pwd, backups, run_id, f"{bal_tag}|{plecho_title}")
             return None
         if res["changed"]:
             any_changed = True
             backups[path] = res["original"]
             svc_log("action", "ok",
-                    f"[{plecho_title}] {direction} {path}: {len(res['modified_lines'])} стр. ({', '.join(keys)})",
+                    f"{pre} {dir_ru} {path}: {len(res['modified_lines'])} стр. ({', '.join(keys)})",
                     run_id)
         else:
             svc_log("action", "info",
-                    f"[{plecho_title}] {direction} {path}: уже в нужном состоянии ({', '.join(keys)})",
+                    f"{pre} {dir_ru} {path}: уже в нужном состоянии ({', '.join(keys)})",
                     run_id)
 
     if any_changed:
@@ -3099,12 +3618,42 @@ def _orch_apply_balancing(entries, svc_paths, ssh, sudo_pwd, run_id, plecho_titl
             _nginx_test(ssh, sudo_pwd)
             _nginx_reload(ssh, sudo_pwd)
         except BalancerError as e:
-            svc_log("error", "err", f"[{plecho_title}] {e}", run_id)
-            _orch_rollback_files(ssh, sudo_pwd, backups, run_id, plecho_title)
-            svc_log("error", "err", f"[{plecho_title}] STOP", run_id)
+            svc_log("error", "err", f"{pre} {e}", run_id)
+            _orch_rollback_files(ssh, sudo_pwd, backups, run_id, f"{bal_tag}|{plecho_title}")
+            svc_log("error", "err", f"{pre} STOP", run_id)
             return None
-        svc_log("action", "ok", f"[{plecho_title}] nginx -t ok, reload ok", run_id)
+        svc_log("action", "ok", f"{pre} nginx -t ok, reload ok", run_id)
     return any_changed
+
+
+def _orch_apply_balancing_both(entries, svc_paths_int, svc_paths_ext,
+                               ssh_int, sudo_int, ssh_ext, sudo_ext,
+                               run_id, plecho_title, direction):
+    """Применяет drain/return сразу на обоих балансерах (если есть пути на ext
+    и ext-SSH открыт). Возвращает True/False/None как _orch_apply_balancing.
+    None означает что хоть один балансер упал — оркестратор должен прерваться."""
+    res_int = _orch_apply_balancing(entries, svc_paths_int, ssh_int, sudo_int,
+                                    run_id, plecho_title, direction, "int")
+    if res_int is None:
+        return None
+
+    needs_ext = ssh_ext is not None and any(
+        svc_paths_ext.get(e["service"]) for e in entries
+    )
+    if not needs_ext:
+        return res_int
+
+    res_ext = _orch_apply_balancing(entries, svc_paths_ext, ssh_ext, sudo_ext,
+                                    run_id, plecho_title, direction, "ext")
+    if res_ext is None:
+        # Внутренний уже применён — внешний упал. Не откатываем int автоматически,
+        # просто прекращаем серию: оркестратор зафиксирует STOP, оператор разберётся.
+        svc_log("error", "err",
+                f"[ext][{plecho_title}] STOP — внутренний балансер уже изменён, "
+                "внешний — нет. Разбирайся вручную.",
+                run_id)
+        return None
+    return bool(res_int or res_ext)
 
 
 def _orch_restart_one(entry, auth, run_id, plecho_title, role_label):
@@ -3160,6 +3709,7 @@ def _orch_restart_one(entry, auth, run_id, plecho_title, role_label):
         return False
     if _inceptum_wait_status(host, app_name, "Started", auth, run_id, label,
                               deadline_sec=INCEPTUM_START_WAIT):
+        svc_log("action", "ok", f"{label}: перезагрузка готова", run_id)
         return True
 
     if _orch_is_cancelled(run_id):
@@ -3184,6 +3734,7 @@ def _orch_restart_one(entry, auth, run_id, plecho_title, role_label):
         svc_log("error", "err",
                 f"{label}: не стартанул даже после Kill+Start, STOP", run_id)
         return False
+    svc_log("action", "ok", f"{label}: перезагрузка готова (со 2-й попытки)", run_id)
     return True
 
 
@@ -3197,7 +3748,11 @@ def _orch_simple_one(entry, auth, run_id, plecho_title, action_kind, target):
     if rc < 200 or rc >= 300:
         svc_log("error", "err", f"{label}: {rest_action} HTTP {rc}: {body}", run_id)
         return False
-    return _inceptum_wait_status(host, app_name, target, auth, run_id, label)
+    ok = _inceptum_wait_status(host, app_name, target, auth, run_id, label)
+    if ok:
+        verb_ru = "запуск готов" if action_kind == "start" else "остановка готова"
+        svc_log("action", "ok", f"{label}: {verb_ru}", run_id)
+    return ok
 
 
 def _orch_sleep_with_cancel(seconds, run_id):
@@ -3233,27 +3788,51 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
         if action in ("restart", "drain", "return"):
             if not creds or not creds.get("ssh_host"):
                 svc_log("error", "err",
-                        "SSH балансировщика не настроен. Зайдите в «Учётки для балансировки».",
+                        "SSH внутреннего балансировщика не настроен. Зайдите в «Учётки для балансировки».",
                         run_id, username)
                 return
 
-        nodes_map, svc_paths, groups = _orch_load_context(pairs)
+        nodes_map, svc_paths_int, svc_paths_ext, groups = _orch_load_context(pairs)
         plechos = _orch_group_pairs(pairs, nodes_map)
         if not plechos:
             svc_log("error", "err", "Нет валидных нод для обработки", run_id)
+            return
+
+        # Какие сервисы реально задействованы в этом прогоне
+        active_svcs = {s for _, s in pairs}
+        # Нужен ли внешний балансер хотя бы одному из них?
+        ext_needed = (
+            action in ("restart", "drain", "return")
+            and any(svc_paths_ext.get(s) for s in active_svcs)
+        )
+        ext_has_creds = bool(creds and creds.get("ext_ssh_host") and creds.get("ext_ssh_login"))
+        if ext_needed and not ext_has_creds:
+            svc_log("error", "err",
+                    "Для одного из сервисов задан внешний nginx, но SSH-учётка внешнего "
+                    "балансировщика не настроена. Зайдите в «Учётки».",
+                    run_id, username)
             return
 
         group_order = [g["group_key"] for g in groups]
         group_titles = {g["group_key"]: g["title"] for g in groups}
 
         # Открыть SSH если нужно
-        ssh = None
+        ssh_int = None
+        ssh_ext = None
         if action in ("restart", "drain", "return"):
             try:
-                ssh = _ssh_open(creds)
+                ssh_int = _ssh_open(creds)
             except BalancerError as e:
                 svc_log("error", "err", str(e), run_id)
                 return
+            if ext_needed:
+                try:
+                    ssh_ext = _ext_ssh_open(creds)
+                except BalancerError as e:
+                    svc_log("error", "err", str(e), run_id)
+                    try: ssh_int.close()
+                    except Exception: pass
+                    return
 
         try:
             verb_map = {
@@ -3262,23 +3841,38 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                 "start":       "Включение",
                 "stop":        "Выключение",
                 "drain":       "Вывод из ротации",
-                "return":      "Возврат в ротацию",
+                "return":      "Ввод в ротацию",
             }
             total = sum(len(p["master"]) + len(p["slaves"]) for p in plechos.values())
+            _orch_progress_set_total(run_id, total)
+            bal_scope = (
+                "внутр.+внеш." if ssh_ext is not None
+                else "внутр." if ssh_int is not None
+                else "без nginx"
+            )
             svc_log("action", "info",
-                    f"=== {verb_map[action]}: {len(plechos)} плеч, {total} пар (запустил {username}) ===",
+                    f"=== {verb_map[action]}: {len(plechos)} плеч, {total} пар, "
+                    f"балансер: {bal_scope} (запустил {username}) ===",
                     run_id, username)
 
-            sudo_pwd = (creds or {}).get("ssh_sudo_pwd") or ""
+            sudo_int = (creds or {}).get("ssh_sudo_pwd") or ""
+            sudo_ext = (creds or {}).get("ext_ssh_sudo_pwd") or ""
             plecho_keys = [g for g in group_order if g in plechos]
 
             # ---- Upfront nginx -t: до любых правок ----
-            if ssh is not None:
+            if ssh_int is not None:
                 try:
-                    _nginx_test(ssh, sudo_pwd)
-                    svc_log("action", "info", "nginx -t ok — можно начинать", run_id)
+                    _nginx_test(ssh_int, sudo_int)
+                    svc_log("action", "info", "[int] nginx -t ok — можно начинать", run_id)
                 except BalancerError as e:
-                    svc_log("error", "err", f"nginx -t упал до начала операций: {e}\nSTOP", run_id)
+                    svc_log("error", "err", f"[int] nginx -t упал до начала операций: {e}\nSTOP", run_id)
+                    return
+            if ssh_ext is not None:
+                try:
+                    _nginx_test(ssh_ext, sudo_ext)
+                    svc_log("action", "info", "[ext] nginx -t ok — можно начинать", run_id)
+                except BalancerError as e:
+                    svc_log("error", "err", f"[ext] nginx -t упал до начала операций: {e}\nSTOP", run_id)
                     return
 
             # ---- DRAIN-only ----
@@ -3288,8 +3882,12 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                     title = group_titles.get(gk, gk)
                     plecho = plechos[gk]
                     all_entries = plecho["master"] + plecho["slaves"]
-                    if _orch_apply_balancing(all_entries, svc_paths, ssh, sudo_pwd, run_id, title, "drain") is None:
+                    if _orch_apply_balancing_both(
+                            all_entries, svc_paths_int, svc_paths_ext,
+                            ssh_int, sudo_int, ssh_ext, sudo_ext,
+                            run_id, title, "drain") is None:
                         return
+                    _orch_progress_inc(run_id, len(all_entries))
                 return
 
             # ---- RETURN-only ----
@@ -3299,8 +3897,12 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                     title = group_titles.get(gk, gk)
                     plecho = plechos[gk]
                     all_entries = plecho["master"] + plecho["slaves"]
-                    if _orch_apply_balancing(all_entries, svc_paths, ssh, sudo_pwd, run_id, title, "return") is None:
+                    if _orch_apply_balancing_both(
+                            all_entries, svc_paths_int, svc_paths_ext,
+                            ssh_int, sudo_int, ssh_ext, sudo_ext,
+                            run_id, title, "return") is None:
                         return
+                    _orch_progress_inc(run_id, len(all_entries))
                 return
 
             # ---- START / STOP (без балансировки) ----
@@ -3314,7 +3916,9 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                     with ThreadPoolExecutor(max_workers=min(16, len(all_entries))) as ex:
                         futs = [ex.submit(_orch_simple_one, e, auth, run_id, title, action, target)
                                 for e in all_entries]
-                        for f in futs: f.result()
+                        for f in as_completed(futs):
+                            f.result()
+                            _orch_progress_inc(run_id)
                 return
 
             # ---- RESTART RAW ----
@@ -3328,19 +3932,26 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                         if _orch_is_cancelled(run_id): break
                         if not _orch_restart_one(e, auth, run_id, title, "master"):
                             svc_log("error", "err", f"[{title}] master {e['host_key']} :: {e['service']} провалился, продолжаю", run_id)
+                        _orch_progress_inc(run_id)
                     # Slaves параллельно
                     if plecho["slaves"] and not _orch_is_cancelled(run_id):
                         with ThreadPoolExecutor(max_workers=min(16, len(plecho["slaves"]))) as ex:
                             futs = [ex.submit(_orch_restart_one, e, auth, run_id, title, "slave")
                                     for e in plecho["slaves"]]
-                            for f in futs: f.result()
+                            for f in as_completed(futs):
+                                f.result()
+                                _orch_progress_inc(run_id)
                 return
 
             # ---- RESTART С БАЛАНСИРОВКОЙ ----
             # Логика per-сервис, сервисы обрабатываются последовательно.
-            # Для балансируемого сервиса с 2+ плечами — плечо за плечом: drain всего
-            #   плеча → пауза → master (последовательно) → slaves (параллельно) →
-            #   return плеча → пауза.
+            # Для балансируемого сервиса с 2+ плечами — плечо за плечом целиком:
+            #   1) drain всего плеча (master + ВСЕ slaves одним апдейтом nginx) → пауза;
+            #   2) restart master последовательно;
+            #   3) restart slaves параллельно;
+            #   4) return в ротацию ТОЛЬКО тех, кто поднялся в Started
+            #      (упавшие — в лог ошибок, в ротацию НЕ возвращаются);
+            #   → следующее плечо (даже если в этом кто-то не поднялся).
             # Для балансируемого сервиса с 1 плечом — нода за нодой: master, затем
             #   каждый slave отдельно — (drain ноды → пауза → restart → return ноды →
             #   пауза).
@@ -3363,13 +3974,18 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
             for svc_name in services_order:
                 if _orch_is_cancelled(run_id): break
                 svc_plechos = services_by_name[svc_name]
-                is_balanced = bool(svc_paths.get(svc_name))
+                has_int = bool(svc_paths_int.get(svc_name))
+                has_ext = bool(svc_paths_ext.get(svc_name)) and ssh_ext is not None
+                is_balanced = has_int or has_ext
                 plechos_in_order = [g for g in plecho_keys if g in svc_plechos]
 
+                if has_int and has_ext: bal_lbl = "балансируемый: внутр.+внеш."
+                elif has_int:           bal_lbl = "балансируемый: внутр."
+                elif has_ext:           bal_lbl = "балансируемый: внеш."
+                else:                   bal_lbl = "не балансируется"
+
                 svc_log("action", "info",
-                        f"=== Сервис {svc_name} "
-                        f"({'балансируемый' if is_balanced else 'не балансируется'}, "
-                        f"плеч: {len(plechos_in_order)}) ===",
+                        f"=== Сервис {svc_name} ({bal_lbl}, плеч: {len(plechos_in_order)}) ===",
                         run_id)
 
                 if not is_balanced:
@@ -3384,26 +4000,47 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                                 svc_log("error", "err",
                                         f"[{title}] master {e['host_key']} :: {e['service']} провалился, продолжаю",
                                         run_id)
+                            _orch_progress_inc(run_id)
                         for e in plecho["slaves"]:
                             if _orch_is_cancelled(run_id): break
                             if not _orch_restart_one(e, auth, run_id, title, "slave"):
                                 svc_log("error", "err",
                                         f"[{title}] slave {e['host_key']} :: {e['service']} провалился, продолжаю",
                                         run_id)
+                            _orch_progress_inc(run_id)
                     continue
 
                 # Балансируемый
+                # Для каждого сервиса делаем срез путей: внешний — только если для
+                # него реально что-то задано, иначе апдейт пропустится сам.
+                svc_paths_int_one = {svc_name: svc_paths_int.get(svc_name, [])}
+                svc_paths_ext_one = {svc_name: svc_paths_ext.get(svc_name, [])}
+
                 if len(plechos_in_order) >= 2:
-                    # 2+ плеча: плечо за плечом, drain всего плеча, master+slaves, return
+                    # 2+ плеча: плечо за плечом целиком.
+                    # Для каждого плеча: drain всего плеча → restart master →
+                    # restart slaves параллельно → return в ротацию только тех,
+                    # кто поднялся в Started. Упавшие ноды (master или slave)
+                    # — в лог ошибок, в ротацию не возвращаем, переходим к
+                    # следующему плечу.
                     for gk in plechos_in_order:
                         if _orch_is_cancelled(run_id): break
                         plecho = svc_plechos[gk]
                         title = group_titles.get(gk, gk)
-                        all_entries = plecho["master"] + plecho["slaves"]
-                        svc_log("action", "info", f"=== [{svc_name}] Плечо {title} ===", run_id)
+                        master_entries = plecho["master"]
+                        slave_entries = plecho["slaves"]
+                        all_entries = master_entries + slave_entries
+                        if not all_entries:
+                            continue
 
-                        drained = _orch_apply_balancing(
-                            all_entries, svc_paths, ssh, sudo_pwd, run_id, title, "drain")
+                        svc_log("action", "info",
+                                f"=== [{svc_name}] Плечо {title} ===", run_id)
+
+                        # 1) drain всего плеча одним апдейтом nginx
+                        drained = _orch_apply_balancing_both(
+                            all_entries, svc_paths_int_one, svc_paths_ext_one,
+                            ssh_int, sudo_int, ssh_ext, sudo_ext,
+                            run_id, title, "drain")
                         if drained is None: return
                         if _orch_is_cancelled(run_id): break
                         if drained:
@@ -3411,45 +4048,49 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                                     f"[{title}] жду {balance_wait_sec}с разбалансировки nginx", run_id)
                             if not _orch_sleep_with_cancel(balance_wait_sec, run_id): break
 
-                        failed_entries = []
-                        # Master — последовательно (обычно один, но подстраховались)
-                        for e in plecho["master"]:
+                        failed_nodes = []
+
+                        # 2) restart master(ов) последовательно
+                        for e in master_entries:
                             if _orch_is_cancelled(run_id): break
                             if not _orch_restart_one(e, auth, run_id, title, "master"):
-                                failed_entries.append((e["host_key"], e["service"]))
-                        if failed_entries:
-                            svc_log("error", "err",
-                                    f"[{title}] master не вернулся в Started — STOP плеча, ноды остались drained",
-                                    run_id)
-                            continue
+                                failed_nodes.append((e["host_key"], e["service"]))
+                            _orch_progress_inc(run_id)
                         if _orch_is_cancelled(run_id): break
 
-                        # Slaves — параллельно
-                        if plecho["slaves"]:
-                            with ThreadPoolExecutor(max_workers=min(16, len(plecho["slaves"]))) as ex:
+                        # 3) restart slaves параллельно
+                        if slave_entries:
+                            with ThreadPoolExecutor(max_workers=min(16, len(slave_entries))) as ex:
                                 futs = {ex.submit(_orch_restart_one, e, auth, run_id, title, "slave"): e
-                                        for e in plecho["slaves"]}
-                                for f, e in futs.items():
+                                        for e in slave_entries}
+                                for f in as_completed(futs):
+                                    e = futs[f]
                                     if not f.result():
-                                        failed_entries.append((e["host_key"], e["service"]))
-                            if failed_entries:
-                                bad = ", ".join(f"{hk}::{svc}" for hk, svc in failed_entries)
-                                svc_log("error", "err",
-                                        f"[{title}] не вернулись в Started: {bad} — не возвращаю в ротацию",
-                                        run_id)
+                                        failed_nodes.append((e["host_key"], e["service"]))
+                                    _orch_progress_inc(run_id)
                         if _orch_is_cancelled(run_id): break
 
-                        failed_set = set(failed_entries)
-                        entries_to_return = [e for e in all_entries
-                                             if (e["host_key"], e["service"]) not in failed_set]
-                        returned = _orch_apply_balancing(
-                            entries_to_return, svc_paths, ssh, sudo_pwd, run_id, title, "return")
-                        if returned is None: return
-                        if _orch_is_cancelled(run_id): break
-                        if returned:
-                            svc_log("action", "info",
-                                    f"[{title}] жду {balance_wait_sec}с возврата балансировки", run_id)
-                            if not _orch_sleep_with_cancel(balance_wait_sec, run_id): break
+                        if failed_nodes:
+                            bad = ", ".join(f"{hk}::{svc}" for hk, svc in failed_nodes)
+                            svc_log("error", "err",
+                                    f"[{title}] не вернулись в Started: {bad} — НЕ возвращаю их в ротацию",
+                                    run_id)
+
+                        # 4) return в ротацию только поднявшихся
+                        failed_set = set(failed_nodes)
+                        nodes_to_return = [e for e in all_entries
+                                           if (e["host_key"], e["service"]) not in failed_set]
+                        if nodes_to_return:
+                            returned = _orch_apply_balancing_both(
+                                nodes_to_return, svc_paths_int_one, svc_paths_ext_one,
+                                ssh_int, sudo_int, ssh_ext, sudo_ext,
+                                run_id, title, "return")
+                            if returned is None: return
+                            if _orch_is_cancelled(run_id): break
+                            if returned:
+                                svc_log("action", "info",
+                                        f"[{title}] жду {balance_wait_sec}с возврата балансировки", run_id)
+                                if not _orch_sleep_with_cancel(balance_wait_sec, run_id): break
                     continue
 
                 # 1 плечо балансируемого: нода за нодой
@@ -3466,8 +4107,10 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                             run_id)
 
                     # drain одной ноды
-                    drained = _orch_apply_balancing(
-                        [e], svc_paths, ssh, sudo_pwd, run_id, title, "drain")
+                    drained = _orch_apply_balancing_both(
+                        [e], svc_paths_int_one, svc_paths_ext_one,
+                        ssh_int, sudo_int, ssh_ext, sudo_ext,
+                        run_id, title, "drain")
                     if drained is None: return
                     if _orch_is_cancelled(run_id): break
                     if drained:
@@ -3477,6 +4120,7 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
 
                     # restart
                     ok_restart = _orch_restart_one(e, auth, run_id, title, role_label)
+                    _orch_progress_inc(run_id)
                     if _orch_is_cancelled(run_id): break
 
                     if not ok_restart:
@@ -3487,8 +4131,10 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                         continue   # остаётся drained, трогаем следующую ноду
 
                     # return
-                    returned = _orch_apply_balancing(
-                        [e], svc_paths, ssh, sudo_pwd, run_id, title, "return")
+                    returned = _orch_apply_balancing_both(
+                        [e], svc_paths_int_one, svc_paths_ext_one,
+                        ssh_int, sudo_int, ssh_ext, sudo_ext,
+                        run_id, title, "return")
                     if returned is None: return
                     if _orch_is_cancelled(run_id): break
                     if returned:
@@ -3497,8 +4143,11 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
                         if not _orch_sleep_with_cancel(balance_wait_sec, run_id): break
 
         finally:
-            if ssh:
-                try: ssh.close()
+            if ssh_int:
+                try: ssh_int.close()
+                except Exception: pass
+            if ssh_ext:
+                try: ssh_ext.close()
                 except Exception: pass
 
         if _orch_is_cancelled(run_id):
@@ -3508,6 +4157,112 @@ def _orch_run(action, pairs, balance_wait_sec, run_id, username):
     except Exception as e:
         app.logger.exception("orchestrator crashed")
         svc_log("error", "err", f"Сценарий упал с непредвиденной ошибкой: {e}", run_id, username)
+    finally:
+        _orch_release(run_id)
+        if ctx is not None:
+            try: ctx.pop()
+            except Exception: pass
+
+
+# ===== Воркер для API-балансировки (без Inceptum) =====
+def _orch_run_api(action, ops, run_id, username):
+    """Прогон drain/return по API-записям на ВНЕШНЕМ nginx.
+    ops — список {entry_id, name, path, keys: [...]} (предвалидированный).
+    """
+    try:
+        ctx = app.app_context()
+        ctx.push()
+    except Exception:
+        ctx = None
+    try:
+        creds = get_balancer_creds()
+        if not creds or not creds.get("ext_ssh_host"):
+            svc_log("error", "err",
+                    "SSH внешнего балансировщика не настроен. Зайдите в «Учётки».",
+                    run_id, username)
+            return
+
+        if not ops:
+            svc_log("error", "err", "Нет валидных операций", run_id)
+            return
+
+        total = sum(len(o["keys"]) for o in ops)
+        _orch_progress_set_total(run_id, total)
+        verb = {
+            "api_drain":  "Вывод из ротации (API)",
+            "api_return": "Ввод в ротацию (API)",
+        }.get(action, action)
+        svc_log("action", "info",
+                f"=== {verb}: {len(ops)} файл(ов), {total} ключей "
+                f"(запустил {username}) ===",
+                run_id, username)
+
+        try:
+            ssh = _ext_ssh_open(creds)
+        except BalancerError as e:
+            svc_log("error", "err", str(e), run_id)
+            return
+        sudo = creds.get("ext_ssh_sudo_pwd") or ""
+
+        try:
+            try:
+                _nginx_test(ssh, sudo)
+                svc_log("action", "info", "[ext] nginx -t ok — можно начинать", run_id)
+            except BalancerError as e:
+                svc_log("error", "err", f"[ext] nginx -t упал до начала: {e}\nSTOP", run_id)
+                return
+
+            direction = "drain" if action == "api_drain" else "return"
+            dir_ru = _DIR_RU.get(direction, direction)
+
+            backups = {}
+            any_changed = False
+            for op in ops:
+                if _orch_is_cancelled(run_id): break
+                pre = f"[ext][{op['name']}]"
+                try:
+                    res = _balancer_apply(ssh, sudo, op["path"], op["keys"], direction)
+                except BalancerError as e:
+                    svc_log("error", "err",
+                            f"{pre} {dir_ru} {op['path']}: {e}\nSTOP", run_id)
+                    _orch_rollback_files(ssh, sudo, backups, run_id, f"ext|{op['name']}")
+                    return
+                if res["changed"]:
+                    any_changed = True
+                    backups[op["path"]] = res["original"]
+                    svc_log("action", "ok",
+                            f"{pre} {dir_ru} {op['path']}: "
+                            f"{len(res['modified_lines'])} стр. ({', '.join(op['keys'])})",
+                            run_id)
+                else:
+                    svc_log("action", "info",
+                            f"{pre} {dir_ru} {op['path']}: "
+                            f"уже в нужном состоянии ({', '.join(op['keys'])})",
+                            run_id)
+                _orch_progress_inc(run_id, len(op["keys"]))
+
+            if any_changed and not _orch_is_cancelled(run_id):
+                try:
+                    _nginx_test(ssh, sudo)
+                    _nginx_reload(ssh, sudo)
+                    svc_log("action", "ok", "[ext] nginx -t ok, reload ok", run_id)
+                except BalancerError as e:
+                    svc_log("error", "err", f"[ext] {e}", run_id)
+                    _orch_rollback_files(ssh, sudo, backups, run_id, "ext|api")
+                    svc_log("error", "err", "[ext] STOP", run_id)
+                    return
+        finally:
+            try: ssh.close()
+            except Exception: pass
+
+        if _orch_is_cancelled(run_id):
+            svc_log("action", "warn", "=== ПРЕРВАНО ПОЛЬЗОВАТЕЛЕМ ===", run_id, username)
+        else:
+            svc_log("action", "ok", "=== Готово ===", run_id, username)
+    except Exception as e:
+        app.logger.exception("api orchestrator crashed")
+        svc_log("error", "err",
+                f"API-сценарий упал с непредвиденной ошибкой: {e}", run_id, username)
     finally:
         _orch_release(run_id)
         if ctx is not None:
@@ -3580,6 +4335,78 @@ def svc_orchestrate():
     })
 
 
+@app.post("/api/api-balancer/orchestrate")
+def api_balancer_orchestrate():
+    """Запуск drain/return по API-записям. Тот же глобальный замок, что и у
+    микросервисов: нельзя запустить параллельно с обычной операцией."""
+    u, err = require_route("Balancer")
+    if err: return err
+    data = request.get_json(silent=True) or {}
+    action = (data.get("action") or "").strip()
+    items = data.get("items") or []
+    if action not in ("api_drain", "api_return"):
+        return jsonify({"error": "Неизвестное действие"}), 400
+    if not isinstance(items, list) or not items:
+        return jsonify({"error": "items пуст"}), 400
+
+    # Загружаем записи и валидируем переданные ключи
+    rows = db().execute(
+        "SELECT id, name, path, search_keys FROM api_balancer_entries"
+    ).fetchall()
+    by_id = {r["id"]: r for r in rows}
+    ops = []
+    for it in items:
+        if not isinstance(it, dict): continue
+        try:
+            eid = int(it.get("entry_id"))
+        except (TypeError, ValueError):
+            continue
+        e = by_id.get(eid)
+        if not e: continue
+        allowed = set(_api_keys_flatten_keys(_api_keys_parse(e["search_keys"])))
+        keys = it.get("keys") or []
+        if not isinstance(keys, list): continue
+        keys = [str(k).strip() for k in keys
+                if str(k).strip() in allowed and API_ENTRY_KEY_RE.match(str(k).strip())]
+        if not keys: continue
+        ops.append({
+            "entry_id": eid,
+            "name":     e["name"],
+            "path":     e["path"],
+            "keys":     keys,
+        })
+    if not ops:
+        return jsonify({"error": "Нет валидных операций"}), 400
+
+    ok, run_id, current = _orch_acquire(action, u["username"])
+    if not ok:
+        return jsonify({"error": "Уже идёт операция", "current": current}), 409
+
+    try:
+        cur_max_action = db().execute(
+            "SELECT COALESCE(MAX(id), 0) FROM svc_console WHERE kind = 'action'"
+        ).fetchone()[0] or 0
+        cur_max_error = db().execute(
+            "SELECT COALESCE(MAX(id), 0) FROM svc_console WHERE kind = 'error'"
+        ).fetchone()[0] or 0
+    except Exception:
+        cur_max_action = 0
+        cur_max_error = 0
+
+    t = threading.Thread(
+        target=_orch_run_api,
+        args=(action, ops, run_id, u["username"]),
+        daemon=True,
+    )
+    t.start()
+    return jsonify({
+        "ok": True,
+        "run_id": run_id,
+        "log_cutoff_action": cur_max_action,
+        "log_cutoff_error":  cur_max_error,
+    })
+
+
 @app.get("/api/svc/orchestrate/state")
 def svc_orchestrate_state():
     _, err = require_route("Balancer")
@@ -3611,11 +4438,64 @@ def svc_orchestrate_force_unlock():
     return jsonify({"ok": True})
 
 
+def _rotation_scan_balancer(ssh, sudo_pwd, paths_by_svc, needed_keys_per_svc):
+    """Просканировать nginx-конфиги одного балансера и вернуть
+    {svc: {host_key: {path: True/False/None}}}.
+    Значение по path:
+      True  — упоминание ключа найдено и не закомментировано (в ротации в этом файле);
+      False — упоминание есть, но закомментировано (выведено из ротации в этом файле);
+      None  — упоминание не найдено / файл не прочитался.
+    Если для сервиса нет путей — out[svc][host] = {} (пустой словарь)."""
+    file_cache = {}  # path -> [first NGINX_SEARCH_LINES lines] | None
+    def get_first_lines(path):
+        if path in file_cache: return file_cache[path]
+        rc, content, _err = _ssh_run_sudo(ssh, sudo_pwd,
+                                          f"head -n {NGINX_SEARCH_LINES} {shlex.quote(path)}")
+        if rc != 0:
+            file_cache[path] = None
+            return None
+        file_cache[path] = content.split("\n")[:NGINX_SEARCH_LINES]
+        return file_cache[path]
+
+    out = {}
+    for svc, keys in needed_keys_per_svc.items():
+        paths = paths_by_svc.get(svc, [])
+        out[svc] = {}
+        for k in keys:
+            out[svc][k] = {}
+            if not paths:
+                continue
+            stripped = _strip_node_prefix(k).lower()
+            rgx = re.compile(r"\b" + re.escape(stripped) + r"\b", re.IGNORECASE)
+            for p in paths:
+                lines = get_first_lines(p)
+                if not lines:
+                    out[svc][k][p] = None
+                    continue
+                found_un = False
+                found_co = False
+                for ln in lines:
+                    if rgx.search(ln):
+                        if ln.lstrip().startswith("#"):
+                            found_co = True
+                        else:
+                            found_un = True
+                        break
+                if found_un:
+                    out[svc][k][p] = True
+                elif found_co:
+                    out[svc][k][p] = False
+                else:
+                    out[svc][k][p] = None
+    return out
+
+
 @app.post("/api/svc/rotation")
 def svc_rotation():
-    """Реальное состояние «в ротации» по nginx-конфигам.
+    """Реальное состояние «в ротации» по nginx-конфигам внутреннего и внешнего балансеров.
     body: {queries: [{service, hosts: [...]}]}
-    Возвращает: {results: {service: {host_key: true(в ротации)|false(выведен)|null(не найден)}}}.
+    Возвращает: {results: {service: {host_key: {int: T/F/null, ext: T/F/null}}}}.
+    int/ext = null означает «не балансируется на этом балансере».
     """
     _, err = require_route("Balancer")
     if err: return err
@@ -3641,69 +4521,76 @@ def svc_rotation():
 
     ph = ",".join(["?"] * len(svc_names))
     rows = db().execute(
-        f"SELECT name, balancer_paths FROM ms_catalog WHERE name IN ({ph})",
+        f"SELECT name, balancer_paths, balancer_paths_ext FROM ms_catalog WHERE name IN ({ph})",
         svc_names,
     ).fetchall()
-    paths_by_svc = {r["name"]: json.loads(r["balancer_paths"] or "[]") for r in rows}
+    paths_int_by_svc = {r["name"]: json.loads(r["balancer_paths"]     or "[]") for r in rows}
+    paths_ext_by_svc = {r["name"]: json.loads(r["balancer_paths_ext"] or "[]") for r in rows}
 
     creds = get_balancer_creds()
     if not creds or not creds.get("ssh_host"):
-        return jsonify({"error": "SSH балансировщика не настроен"}), 400
+        return jsonify({"error": "SSH внутреннего балансировщика не настроен"}), 400
+
+    # есть ли смысл лезть на внешний — хоть один сервис с ext-путями?
+    has_ext_paths = any(paths_ext_by_svc.get(s) for s in svc_names)
+    has_ext_creds = bool(creds.get("ext_ssh_host") and creds.get("ext_ssh_login"))
+
+    # Внутренний — обязательно
     try:
-        ssh = _ssh_open(creds)
+        ssh_int = _ssh_open(creds)
     except BalancerError as e:
         return jsonify({"error": str(e)}), 502
-    sudo_pwd = creds.get("ssh_sudo_pwd") or ""
+    sudo_int = creds.get("ssh_sudo_pwd") or ""
 
-    file_cache = {}  # path -> [first 35 lines] | None
-    def get_first_lines(path):
-        if path in file_cache: return file_cache[path]
-        rc, content, _err = _ssh_run_sudo(ssh, sudo_pwd,
-                                          f"head -n {NGINX_SEARCH_LINES} {shlex.quote(path)}")
-        if rc != 0:
-            file_cache[path] = None
-            return None
-        file_cache[path] = content.split("\n")[:NGINX_SEARCH_LINES]
-        return file_cache[path]
+    # Внешний — лениво
+    ssh_ext = None
+    sudo_ext = ""
+    ext_err = None
+    if has_ext_paths and has_ext_creds:
+        try:
+            ssh_ext = _ext_ssh_open(creds)
+            sudo_ext = creds.get("ext_ssh_sudo_pwd") or ""
+        except BalancerError as e:
+            ext_err = str(e)
 
-    results = {}
     try:
-        for svc in svc_names:
-            paths = paths_by_svc.get(svc, [])
-            keys = needed_keys_per_svc[svc]
-            results[svc] = {}
-            if not paths:
-                for k in keys:
-                    results[svc][k] = None  # не балансируется
-                continue
-            for k in keys:
-                stripped = _strip_node_prefix(k).lower()
-                rgx = re.compile(r"\b" + re.escape(stripped) + r"\b", re.IGNORECASE)
-                found_uncommented = False
-                found_commented   = False
-                for p in paths:
-                    lines = get_first_lines(p)
-                    if not lines: continue
-                    for ln in lines:
-                        if rgx.search(ln):
-                            if ln.lstrip().startswith("#"):
-                                found_commented = True
-                            else:
-                                found_uncommented = True
-                            break
-                    if found_uncommented:
-                        break  # достаточно одного path с активной строкой
-                if found_uncommented:
-                    results[svc][k] = True
-                elif found_commented:
-                    results[svc][k] = False
-                else:
-                    results[svc][k] = None
-    finally:
-        try: ssh.close()
-        except Exception: pass
+        int_res = _rotation_scan_balancer(ssh_int, sudo_int, paths_int_by_svc, needed_keys_per_svc)
+        ext_res = (_rotation_scan_balancer(ssh_ext, sudo_ext, paths_ext_by_svc, needed_keys_per_svc)
+                   if ssh_ext is not None else
+                   {s: {k: {} for k in needed_keys_per_svc[s]} for s in svc_names})
 
-    return jsonify({"results": results})
+        results = {}
+        for svc in svc_names:
+            results[svc] = {}
+            for k in needed_keys_per_svc[svc]:
+                int_paths = int_res.get(svc, {}).get(k) or {}
+                ext_paths = ext_res.get(svc, {}).get(k) or {}
+                # Пустой словарь (нет путей у этого балансера) → null,
+                # чтобы фронт ясно видел «балансер не задействован».
+                results[svc][k] = {
+                    "int": int_paths if int_paths else None,
+                    "ext": ext_paths if ext_paths else None,
+                }
+        out = {
+            "results": results,
+            # Список путей по сервисам — фронт по нему рисует колонки.
+            "paths_by_svc": {
+                s: {
+                    "int": list(paths_int_by_svc.get(s, [])),
+                    "ext": list(paths_ext_by_svc.get(s, [])),
+                }
+                for s in svc_names
+            },
+        }
+        if ext_err:
+            out["ext_warning"] = ext_err
+        return jsonify(out)
+    finally:
+        try: ssh_int.close()
+        except Exception: pass
+        if ssh_ext is not None:
+            try: ssh_ext.close()
+            except Exception: pass
 
 
 @app.post("/api/svc/orchestrate/cancel")
