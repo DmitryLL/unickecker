@@ -3291,33 +3291,71 @@ def _pcs_parse_status_json(data):
         })
     summary["nodes_configured"] = len(nodes_out) if nodes_out else (data.get("node_count") or 0)
 
-    res_in = data.get("resource_list") or []
-    resources_out = []
-    for r in res_in:
-        if not isinstance(r, dict):
-            continue
-        nodes_running = []
-        for nn in r.get("nodes_running_on") or r.get("nodes") or []:
-            if isinstance(nn, dict):
-                nodes_running.append(nn.get("name") or nn.get("uname") or "")
-            elif isinstance(nn, str):
-                nodes_running.append(nn)
-        parent = None
-        if r.get("group"):
-            parent = f"group:{r['group']}"
-        elif r.get("clone_id") or r.get("clone"):
-            parent = f"clone:{r.get('clone_id') or r.get('clone')}"
-        resources_out.append({
-            "id":              r.get("id") or "",
-            "agent":           r.get("resource_agent") or r.get("agentname") or r.get("agent") or "",
-            "role":            r.get("role") or ("Started" if r.get("active") else "Stopped"),
-            "active":          bool(r.get("active") or False),
-            "managed":         bool(r.get("managed", True)),
-            "failed":          bool(r.get("failed") or False),
-            "failure_ignored": bool(r.get("failure_ignored") or False),
-            "nodes":           [n for n in nodes_running if n],
-            "parent":          parent,
-        })
+    # Ресурсы. В /remote/cluster_status формат различается между версиями pcsd:
+    # одни кладут плоский resource_list, другие — вложенный resources с rsc_list.
+    def _walk_resources(seq, parent):
+        for r in seq or []:
+            if not isinstance(r, dict):
+                continue
+            kids = r.get("rsc_list") or r.get("resources") or []
+            if kids and not r.get("id"):
+                # это группа / clone без своего id, пройдём по детям
+                gname = r.get("group_id") or r.get("clone_id") or r.get("id") or ""
+                kind = r.get("class_type") or ("group" if r.get("group_id") else "clone")
+                yield from _walk_resources(kids, f"{kind}:{gname}" if gname else parent)
+                continue
+            nodes_running = []
+            raw_nodes = (
+                r.get("nodes_running_on")
+                or r.get("nodes")
+                or r.get("location")
+                or r.get("running_on")
+                or []
+            )
+            for nn in raw_nodes:
+                if isinstance(nn, dict):
+                    nodes_running.append(nn.get("name") or nn.get("uname") or nn.get("id") or "")
+                elif isinstance(nn, str):
+                    nodes_running.append(nn)
+            # роль/состояние: пробуем несколько ключей
+            role = (
+                r.get("role")
+                or r.get("status")
+                or r.get("state")
+                or r.get("resource_status")
+                or ""
+            )
+            if not role:
+                if r.get("active") or nodes_running:
+                    role = "Started"
+                elif r.get("orphaned"):
+                    role = "Orphaned"
+                else:
+                    role = "Stopped"
+            # вложенность
+            mine_parent = parent
+            if not mine_parent:
+                if r.get("group"):
+                    mine_parent = f"group:{r['group']}"
+                elif r.get("clone_id") or r.get("clone"):
+                    mine_parent = f"clone:{r.get('clone_id') or r.get('clone')}"
+            yield {
+                "id":              r.get("id") or "",
+                "agent":           r.get("resource_agent") or r.get("agentname") or r.get("agent") or r.get("type") or "",
+                "role":            str(role),
+                "active":          bool(r.get("active") or nodes_running),
+                "managed":         bool(r.get("managed", True)),
+                "failed":          bool(r.get("failed") or False),
+                "failure_ignored": bool(r.get("failure_ignored") or False),
+                "nodes":           [n for n in nodes_running if n],
+                "parent":          mine_parent,
+            }
+            # рекурсия (вложенные группы внутри clone и т.п.)
+            if kids:
+                yield from _walk_resources(kids, mine_parent)
+
+    res_in = data.get("resource_list") or data.get("resources") or []
+    resources_out = list(_walk_resources(res_in, None))
     summary["resources_configured"] = len(resources_out)
     return {"ok": True, "summary": summary, "nodes": nodes_out, "resources": resources_out}
 

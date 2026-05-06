@@ -5774,9 +5774,12 @@
                 _pcsState.selectedId = _pcsState.items[0].id;
             }
             const sel = _pcsState.selectedId;
-            const tabs = _pcsState.items.map(c => `
-                <button type="button" class="svc-tool-btn" style="${c.id === sel ? 'border-color:#3b82f6;color:#bfdbfe' : ''}" onclick="selectPcsCluster(${c.id})">${escapeHtml(c.name)}</button>
-            `).join('');
+            // Переключатель показываем только если кластеров больше одного
+            const tabs = _pcsState.items.length > 1
+                ? _pcsState.items.map(c => `
+                    <button type="button" class="svc-tool-btn" style="${c.id === sel ? 'border-color:#3b82f6;color:#bfdbfe' : ''}" onclick="selectPcsCluster(${c.id})">${escapeHtml(c.name)}</button>
+                `).join('')
+                : '';
             root.innerHTML = `
                 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
                     <button type="button" class="svc-tool-btn" onclick="loadPcsStatus(_pcsState.selectedId)">⟳ Обновить</button>
@@ -5832,22 +5835,11 @@
             }
             const s = snap.summary || {};
             const summary = `
-                <div style="background:rgba(17,24,39,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;margin-bottom:18px">
-                    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+                <div style="background:rgba(17,24,39,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px 20px;margin-bottom:18px">
+                    <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
                         <span style="font-size:15px;font-weight:600;color:#c7d2fe">${escapeHtml(snap.name || '')}</span>
-                        <span class="muted" style="font-size:12px">${escapeHtml(snap.host || '')}</span>
                         ${s.cluster_name ? `<span class="muted" style="font-size:12px">кластер «${escapeHtml(s.cluster_name)}»</span>` : ''}
-                    </div>
-                    <div class="muted" style="display:flex;gap:22px;flex-wrap:wrap;font-size:12px">
-                        <span>DC: <b style="color:#e5e7eb">${escapeHtml(s.dc || '—')}</b></span>
-                        <span>Кворум: <b style="color:${s.with_quorum ? '#86efac' : '#fca5a5'}">${s.with_quorum ? 'есть' : 'нет'}</b></span>
-                        <span>Стек: <b style="color:#e5e7eb">${escapeHtml(s.stack || '—')}</b></span>
-                        <span>Нод: <b style="color:#e5e7eb">${s.nodes_configured ?? '—'}</b></span>
-                        <span>Ресурсов: <b style="color:#e5e7eb">${s.resources_configured ?? '—'}</b></span>
-                    </div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-                        <button type="button" class="ms-action-btn start" onclick="pcsClusterAct(${cid}, 'start', this)">Запустить кластер (--all)</button>
-                        <button type="button" class="ms-action-btn stop"  onclick="pcsClusterAct(${cid}, 'stop',  this)">Остановить кластер (--all)</button>
+                        <span class="muted" style="font-size:12px">нод: <b style="color:#e5e7eb">${s.nodes_configured ?? '—'}</b> · ресурсов: <b style="color:#e5e7eb">${s.resources_configured ?? '—'}</b></span>
                     </div>
                 </div>
             `;
@@ -5864,7 +5856,6 @@
                     <tr>
                         <td style="${PCS_TD_STYLE};font-family:ui-monospace,monospace">${escapeHtml(n.name)}</td>
                         <td style="${PCS_TD_STYLE};color:${stateColor};font-weight:500">${state}</td>
-                        <td style="${PCS_TD_STYLE}">${n.maintenance ? 'maint' : '—'}</td>
                         <td style="${PCS_TD_STYLE};text-align:center;width:80px">${n.resources_running}</td>
                         <td style="${PCS_TD_STYLE};white-space:nowrap;width:1%">${actions}</td>
                     </tr>`;
@@ -5875,11 +5866,10 @@
                     <thead><tr>
                         <th style="${PCS_TH_STYLE}">Нода</th>
                         <th style="${PCS_TH_STYLE}">Состояние</th>
-                        <th style="${PCS_TH_STYLE}">Maint</th>
                         <th style="${PCS_TH_STYLE};text-align:center">Ресурсов</th>
                         <th style="${PCS_TH_STYLE}">Действия</th>
                     </tr></thead>
-                    <tbody>${nodesRows || `<tr><td colspan="5" class="muted" style="${PCS_TD_STYLE};text-align:center">— нет данных —</td></tr>`}</tbody>
+                    <tbody>${nodesRows || `<tr><td colspan="4" class="muted" style="${PCS_TD_STYLE};text-align:center">— нет данных —</td></tr>`}</tbody>
                 </table>
             `;
             const resRows = (snap.resources || []).map(r => {
@@ -5897,7 +5887,6 @@
                             <button type="button" class="ms-action-btn restart" onclick="pcsResourceAct(${cid}, '${escapeHtml(r.id)}', 'restart', this)">Restart</button>
                             <button type="button" class="ms-action-btn start"   onclick="pcsResourceAct(${cid}, '${escapeHtml(r.id)}', 'enable',  this)">Enable</button>
                             <button type="button" class="ms-action-btn stop"    onclick="pcsResourceAct(${cid}, '${escapeHtml(r.id)}', 'disable', this)">Disable</button>
-                            <button type="button" class="svc-tool-btn"          onclick="pcsResourceAct(${cid}, '${escapeHtml(r.id)}', 'cleanup', this)">Cleanup</button>
                         </td>
                     </tr>`;
             }).join('');
