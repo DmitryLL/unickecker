@@ -3168,11 +3168,11 @@ def get_balancer_creds():
     }
 
 
-# ===== PCS (Pacemaker) clusters =====
-# Управление HA-кластером по SSH: status / enable / disable / restart / cleanup,
-# standby / unstandby, cluster start --all / stop --all. Все имена ресурсов и
-# нод валидируются регексом и проверяются по живому `pcs status xml`,
-# чтобы исключить инъекции в shell.
+# ===== PCS (Pacemaker) clusters via pcsd HTTP API =====
+# Управление HA-кластером через pcsd (порт 2224). Авторизация — POST /ui/login,
+# cookie token используется для остальных вызовов /remote/*.
+# Имена ресурсов и нод валидируются регексом и проверяются по живому статусу,
+# чтобы исключить отправку произвольных значений на pcsd.
 PCS_NAME_RE = re.compile(r"^[A-Za-z0-9_.:\-]{1,64}$")
 PCS_DEFAULT_TIMEOUT = 20
 
@@ -3186,120 +3186,143 @@ def pcs_cluster_row(cid):
 
 
 def pcs_cluster_decrypt(row):
-    """Принимает sqlite3.Row → dict с расшифрованными паролями."""
+    """Принимает sqlite3.Row → dict с расшифрованными паролями.
+    Поля ssh_* переиспользуются для pcsd: ssh_login=user, ssh_password=password,
+    ssh_port=порт (по умолчанию 2224). Поле ssh_sudo_pwd не используется."""
     if not row:
         return None
     return {
-        "id":           row["id"],
-        "name":         row["name"] or "",
-        "host":         row["host"] or "",
-        "ssh_port":     row["ssh_port"] or 22,
-        "ssh_login":    row["ssh_login"] or "",
-        "ssh_password": decrypt_secret(row["ssh_password"]),
-        "ssh_sudo_pwd": decrypt_secret(row["ssh_sudo_pwd"]),
+        "id":       row["id"],
+        "name":     row["name"] or "",
+        "host":     row["host"] or "",
+        "port":     row["ssh_port"] or 2224,
+        "user":     row["ssh_login"] or "",
+        "password": decrypt_secret(row["ssh_password"]),
     }
 
 
-def _pcs_open(c):
-    """SSH-коннект к ноде кластера. c — расшифрованный dict."""
-    if not c or not c.get("host") or not c.get("ssh_login"):
-        raise BalancerError("SSH-учётка кластера не настроена")
-    return _ssh_connect(c["host"], c.get("ssh_port"),
-                        c["ssh_login"], c.get("ssh_password"))
-
-
-def _pcs_exec(client, sudo_pwd, argv, timeout=PCS_DEFAULT_TIMEOUT):
-    """Запуск `sudo pcs <argv...>`. argv — список валидированных аргументов.
-    Возвращает (rc, stdout, stderr)."""
-    cmd = "pcs " + " ".join(shlex.quote(a) for a in argv)
-    return _ssh_run_sudo(client, sudo_pwd or "", cmd, timeout=timeout)
-
-
-def _pcs_exec_raw(client, sudo_pwd, raw_cmd, timeout=PCS_DEFAULT_TIMEOUT):
-    """Запуск произвольной команды (например, journalctl) под sudo."""
-    return _ssh_run_sudo(client, sudo_pwd or "", raw_cmd, timeout=timeout)
-
-
-def _pcs_parse_status_xml(xml_text):
-    """Парсит вывод `pcs status xml` в нормализованный dict.
-    Возвращает: {ok, summary, nodes, resources, error?}.
-    """
-    import xml.etree.ElementTree as ET
+def _pcsd_login(c, timeout=10):
+    """Логин в pcsd. Возвращает (requests.Session, base_url) или кидает BalancerError."""
+    if requests is None:
+        raise BalancerError("requests не установлен")
+    if not c or not c.get("host") or not c.get("user"):
+        raise BalancerError("Подключение к pcsd не настроено")
+    base = f"https://{c['host']}:{int(c.get('port') or 2224)}"
+    sess = requests.Session()
+    sess.verify = False  # pcsd обычно с самоподписанным сертификатом
     try:
-        root = ET.fromstring(xml_text)
+        # Глушим InsecureRequestWarning (self-signed)
+        try:
+            from urllib3.exceptions import InsecureRequestWarning
+            requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+        except Exception:
+            pass
+        r = sess.post(
+            f"{base}/ui/login",
+            data={"username": c["user"], "password": c.get("password") or ""},
+            timeout=timeout,
+            allow_redirects=False,
+        )
     except Exception as e:
-        return {"ok": False, "error": f"Не удалось распарсить XML: {e}", "raw": xml_text[:1000]}
+        raise BalancerError(f"Подключение к {base}: {e}")
+    if r.status_code not in (200, 302):
+        raise BalancerError(f"Логин в pcsd: HTTP {r.status_code}")
+    if not sess.cookies.get("token"):
+        raise BalancerError("Логин в pcsd: неверный пользователь или пароль")
+    return sess, base
 
-    summary = {}
-    s = root.find("./summary")
-    if s is not None:
-        cur = s.find("./current_dc")
-        if cur is not None:
-            summary["dc"] = cur.attrib.get("name") or ""
-            summary["with_quorum"] = cur.attrib.get("with_quorum") == "true"
-        nc = s.find("./nodes_configured")
-        if nc is not None:
-            summary["nodes_configured"] = int(nc.attrib.get("number") or 0)
-        rc = s.find("./resources_configured")
-        if rc is not None:
-            summary["resources_configured"] = int(rc.attrib.get("number") or 0)
-        v = s.find("./stack")
-        if v is not None:
-            summary["stack"] = v.attrib.get("type") or ""
 
+def _pcsd_get(sess, base, path, timeout=PCS_DEFAULT_TIMEOUT, params=None):
+    try:
+        r = sess.get(f"{base}{path}", timeout=timeout, params=params or {})
+    except Exception as e:
+        raise BalancerError(f"GET {path}: {e}")
+    return r.status_code, r.text
+
+
+def _pcsd_post(sess, base, path, data=None, timeout=60):
+    try:
+        r = sess.post(f"{base}{path}", data=data or {}, timeout=timeout)
+    except Exception as e:
+        raise BalancerError(f"POST {path}: {e}")
+    return r.status_code, r.text
+
+
+def _pcs_parse_status_json(data):
+    """Нормализует ответ /remote/cluster_status в наш единый формат."""
+    if not isinstance(data, dict):
+        return {"ok": False, "error": "Ответ pcsd не похож на словарь"}
+    summary = {
+        "dc":                   data.get("dc_name") or "",
+        "with_quorum":          bool(data.get("quorate", data.get("quorum", False))),
+        "nodes_configured":     None,
+        "resources_configured": None,
+        "stack":                data.get("stack") or "",
+        "cluster_name":         data.get("cluster_name") or "",
+    }
+    nodes_in = data.get("node_list") or []
     nodes_out = []
-    for n in root.findall("./nodes/node"):
+    for n in nodes_in:
+        if not isinstance(n, dict):
+            continue
+        # Поля и их ключи различаются между версиями pcsd. Берём с фолбэками.
         nodes_out.append({
-            "name":           n.attrib.get("name") or "",
-            "online":         n.attrib.get("online") == "true",
-            "standby":        n.attrib.get("standby") == "true",
-            "standby_onfail": n.attrib.get("standby_onfail") == "true",
-            "maintenance":    n.attrib.get("maintenance") == "true",
-            "unclean":        n.attrib.get("unclean") == "true",
-            "shutdown":       n.attrib.get("shutdown") == "true",
-            "type":           n.attrib.get("type") or "",
-            "resources_running": int(n.attrib.get("resources_running") or 0),
+            "name":           n.get("name") or n.get("uname") or "",
+            "online":         bool(n.get("online", True)) and not n.get("offline", False),
+            "standby":        bool(n.get("standby") or (n.get("node_attr") or {}).get("standby") == "on"),
+            "standby_onfail": bool(n.get("standby_onfail") or False),
+            "maintenance":    bool(n.get("maintenance") or False),
+            "unclean":        bool(n.get("unclean") or False),
+            "shutdown":       bool(n.get("shutdown") or False),
+            "type":           n.get("type") or "",
+            "resources_running": int(n.get("resources_running") or 0),
         })
+    summary["nodes_configured"] = len(nodes_out) if nodes_out else (data.get("node_count") or 0)
 
-    def _mk_res(rnode, parent=None):
-        return {
-            "id":            rnode.attrib.get("id") or "",
-            "agent":         rnode.attrib.get("resource_agent") or "",
-            "role":          rnode.attrib.get("role") or "",
-            "active":        rnode.attrib.get("active") == "true",
-            "managed":       rnode.attrib.get("managed") == "true",
-            "failed":        rnode.attrib.get("failed") == "true",
-            "failure_ignored": rnode.attrib.get("failure_ignored") == "true",
-            "nodes":         [nn.attrib.get("name") for nn in rnode.findall("./node")],
-            "parent":        parent,
-        }
-
+    res_in = data.get("resource_list") or []
     resources_out = []
-    rs = root.find("./resources")
-    if rs is not None:
-        for r in rs.findall("./resource"):
-            resources_out.append(_mk_res(r))
-        for grp in rs.findall("./group"):
-            gname = grp.attrib.get("id") or ""
-            for r in grp.findall("./resource"):
-                resources_out.append(_mk_res(r, parent=f"group:{gname}"))
-        for cl in rs.findall("./clone"):
-            cname = cl.attrib.get("id") or ""
-            for r in cl.findall("./resource"):
-                resources_out.append(_mk_res(r, parent=f"clone:{cname}"))
-
+    for r in res_in:
+        if not isinstance(r, dict):
+            continue
+        nodes_running = []
+        for nn in r.get("nodes_running_on") or r.get("nodes") or []:
+            if isinstance(nn, dict):
+                nodes_running.append(nn.get("name") or nn.get("uname") or "")
+            elif isinstance(nn, str):
+                nodes_running.append(nn)
+        parent = None
+        if r.get("group"):
+            parent = f"group:{r['group']}"
+        elif r.get("clone_id") or r.get("clone"):
+            parent = f"clone:{r.get('clone_id') or r.get('clone')}"
+        resources_out.append({
+            "id":              r.get("id") or "",
+            "agent":           r.get("resource_agent") or r.get("agentname") or r.get("agent") or "",
+            "role":            r.get("role") or ("Started" if r.get("active") else "Stopped"),
+            "active":          bool(r.get("active") or False),
+            "managed":         bool(r.get("managed", True)),
+            "failed":          bool(r.get("failed") or False),
+            "failure_ignored": bool(r.get("failure_ignored") or False),
+            "nodes":           [n for n in nodes_running if n],
+            "parent":          parent,
+        })
+    summary["resources_configured"] = len(resources_out)
     return {"ok": True, "summary": summary, "nodes": nodes_out, "resources": resources_out}
 
 
-def _pcs_status_snapshot(client, sudo_pwd):
-    """Один снапшот: pcs status xml + parsed."""
-    rc, out, err = _pcs_exec(client, sudo_pwd, ["status", "xml"])
-    if rc != 0:
-        return {"ok": False, "error": (err or out or f"pcs status xml rc={rc}").strip()}
-    snap = _pcs_parse_status_xml(out)
-    if not snap.get("ok"):
-        return snap
-    return snap
+def _pcs_status_snapshot(sess, base):
+    """Один снапшот: GET /remote/cluster_status → нормализованный JSON."""
+    try:
+        rc, body = _pcsd_get(sess, base, "/remote/cluster_status", timeout=15)
+    except BalancerError as e:
+        return {"ok": False, "error": str(e)}
+    if rc != 200:
+        return {"ok": False, "error": f"cluster_status HTTP {rc}", "raw": body[:300]}
+    try:
+        data = json.loads(body)
+    except Exception:
+        return {"ok": False, "error": "cluster_status вернул не-JSON", "raw": body[:500]}
+    return _pcs_parse_status_json(data)
 
 
 # CRUD endpoints
@@ -3426,19 +3449,24 @@ def pcs_clusters_test(cid):
     if not c:
         return jsonify({"ok": False, "error": "Кластер не найден"}), 404
     try:
-        client = _pcs_open(c)
+        sess, base = _pcsd_login(c)
     except BalancerError as e:
         return jsonify({"ok": False, "error": str(e)}), 200
     try:
-        rc1, ver_out, ver_err = _pcs_exec(client, c["ssh_sudo_pwd"], ["--version"])
-        if rc1 != 0:
-            return jsonify({"ok": False, "error": (ver_err or ver_out or "pcs --version failed").strip()})
-        rc2, st_out, st_err = _pcs_exec(client, c["ssh_sudo_pwd"], ["status", "nodes"])
-        if rc2 != 0:
-            return jsonify({"ok": False, "error": (st_err or st_out or "pcs status nodes failed").strip()})
-        return jsonify({"ok": True, "version": ver_out.strip(), "nodes_text": st_out.strip()})
+        snap = _pcs_status_snapshot(sess, base)
+        if not snap.get("ok"):
+            return jsonify({"ok": False, "error": snap.get("error", "Не удалось прочитать статус")})
+        s = snap.get("summary") or {}
+        return jsonify({
+            "ok": True,
+            "cluster_name": s.get("cluster_name") or "",
+            "dc": s.get("dc") or "",
+            "with_quorum": bool(s.get("with_quorum")),
+            "nodes": len(snap.get("nodes") or []),
+            "resources": len(snap.get("resources") or []),
+        })
     finally:
-        try: client.close()
+        try: sess.close()
         except Exception: pass
 
 
@@ -3450,22 +3478,22 @@ def pcs_clusters_status(cid):
     if not c:
         return jsonify({"ok": False, "error": "Кластер не найден"}), 404
     try:
-        client = _pcs_open(c)
+        sess, base = _pcsd_login(c)
     except BalancerError as e:
         return jsonify({"ok": False, "error": str(e)}), 200
     try:
-        snap = _pcs_status_snapshot(client, c["ssh_sudo_pwd"])
+        snap = _pcs_status_snapshot(sess, base)
         snap["host"] = c["host"]
         snap["name"] = c["name"]
         return jsonify(snap)
     finally:
-        try: client.close()
+        try: sess.close()
         except Exception: pass
 
 
-def _pcs_action_run(cid, argv, audit_msg):
-    """Общая логика endpoint'а действия. argv — список валидированных
-    pcs-аргументов. Возвращает (json_response, http_status)."""
+def _pcs_action_run(cid, path, form_data, audit_msg):
+    """Общая логика действия. path — pcsd-эндпоинт типа '/remote/manage_resource'.
+    form_data — словарь form-параметров. Возвращает Flask response."""
     u = current_user()
     if u is None:
         return jsonify({"ok": False, "error": "Не авторизован"}), 401
@@ -3475,40 +3503,44 @@ def _pcs_action_run(cid, argv, audit_msg):
     if not c:
         return jsonify({"ok": False, "error": "Кластер не найден"}), 404
     try:
-        client = _pcs_open(c)
+        sess, base = _pcsd_login(c)
     except BalancerError as e:
         return jsonify({"ok": False, "error": str(e)}), 200
     try:
-        rc, out, err2 = _pcs_exec(client, c["ssh_sudo_pwd"], argv, timeout=60)
-        ok = (rc == 0)
+        rc, body = _pcsd_post(sess, base, path, data=form_data, timeout=120)
+        ok = (rc == 200)
+        # pcsd иногда возвращает 200 даже при логических ошибках — короткий
+        # ответ часто содержит «success» или код ошибки. Сохраняем как есть.
+        body_short = (body or "").strip()
+        if len(body_short) > 400:
+            body_short = body_short[:400] + "…"
         ms_console_append(
             "info" if ok else "err",
-            f"PCS [{c['name']}]: {audit_msg}" + ("" if ok else f" — ошибка: {(err2 or out or '').strip()[:200]}"),
+            f"PCS [{c['name']}]: {audit_msg}" + ("" if ok else f" — HTTP {rc}: {body_short[:200]}"),
             u["username"],
         )
         return jsonify({
-            "ok": ok,
-            "rc": rc,
-            "output": (out or "").strip(),
-            "error":  "" if ok else (err2 or out or f"rc={rc}").strip(),
+            "ok":     ok,
+            "rc":     rc,
+            "output": body_short,
+            "error":  "" if ok else f"HTTP {rc}: {body_short}",
         })
     finally:
-        try: client.close()
+        try: sess.close()
         except Exception: pass
 
 
 def _pcs_known_resource(cid, name):
-    """Проверяет что ресурс c таким id есть в текущем pcs status."""
     c = pcs_cluster_decrypt(pcs_cluster_row(cid))
     if not c: return False
     try:
-        client = _pcs_open(c)
+        sess, base = _pcsd_login(c)
     except BalancerError:
         return False
     try:
-        snap = _pcs_status_snapshot(client, c["ssh_sudo_pwd"])
+        snap = _pcs_status_snapshot(sess, base)
     finally:
-        try: client.close()
+        try: sess.close()
         except Exception: pass
     if not snap.get("ok"):
         return False
@@ -3519,13 +3551,13 @@ def _pcs_known_node(cid, name):
     c = pcs_cluster_decrypt(pcs_cluster_row(cid))
     if not c: return False
     try:
-        client = _pcs_open(c)
+        sess, base = _pcsd_login(c)
     except BalancerError:
         return False
     try:
-        snap = _pcs_status_snapshot(client, c["ssh_sudo_pwd"])
+        snap = _pcs_status_snapshot(sess, base)
     finally:
-        try: client.close()
+        try: sess.close()
         except Exception: pass
     if not snap.get("ok"):
         return False
@@ -3538,18 +3570,20 @@ def pcs_resource_action(cid, res, action):
     if not _pcs_safe_name(res):
         return jsonify({"ok": False, "error": "Недопустимое имя ресурса"}), 400
     action = (action or "").lower()
-    argv_map = {
-        "enable":  ["resource", "enable",  res],
-        "disable": ["resource", "disable", res],
-        "restart": ["resource", "restart", res],
-        "cleanup": ["resource", "cleanup", res],
-        "refresh": ["resource", "refresh", res],
+    # path, form-data
+    action_map = {
+        "enable":  ("/remote/manage_resource",  {"resource": res, "command": "enable"}),
+        "disable": ("/remote/manage_resource",  {"resource": res, "command": "disable"}),
+        "restart": ("/remote/manage_resource",  {"resource": res, "command": "restart"}),
+        "cleanup": ("/remote/resource_cleanup", {"resource": res}),
+        "refresh": ("/remote/resource_refresh", {"resource": res}),
     }
-    if action not in argv_map:
+    if action not in action_map:
         return jsonify({"ok": False, "error": "Неизвестное действие"}), 400
     if not _pcs_known_resource(cid, res):
         return jsonify({"ok": False, "error": f"Ресурс «{res}» не найден в кластере"}), 404
-    return _pcs_action_run(cid, argv_map[action], f"resource {action} {res}")
+    path, form = action_map[action]
+    return _pcs_action_run(cid, path, form, f"resource {action} {res}")
 
 
 # Действия с нодой
@@ -3558,30 +3592,32 @@ def pcs_node_action(cid, node, action):
     if not _pcs_safe_name(node):
         return jsonify({"ok": False, "error": "Недопустимое имя ноды"}), 400
     action = (action or "").lower()
-    argv_map = {
-        "standby":       ["node",    "standby",   node],
-        "unstandby":     ["node",    "unstandby", node],
-        "cluster-stop":  ["cluster", "stop",      node],
-        "cluster-start": ["cluster", "start",     node],
+    action_map = {
+        "standby":       ("/remote/node_standby",   {"node": node}),
+        "unstandby":     ("/remote/node_unstandby", {"node": node}),
+        "cluster-start": ("/remote/cluster_start",  {"name": node}),
+        "cluster-stop":  ("/remote/cluster_stop",   {"name": node}),
     }
-    if action not in argv_map:
+    if action not in action_map:
         return jsonify({"ok": False, "error": "Неизвестное действие"}), 400
     if not _pcs_known_node(cid, node):
         return jsonify({"ok": False, "error": f"Нода «{node}» не найдена в кластере"}), 404
-    return _pcs_action_run(cid, argv_map[action], f"node {action} {node}")
+    path, form = action_map[action]
+    return _pcs_action_run(cid, path, form, f"node {action} {node}")
 
 
 # Действия с кластером целиком
 @app.post("/api/pcs/clusters/<int:cid>/cluster/<action>")
 def pcs_cluster_action(cid, action):
     action = (action or "").lower()
-    argv_map = {
-        "start": ["cluster", "start", "--all"],
-        "stop":  ["cluster", "stop",  "--all"],
+    action_map = {
+        "start": ("/remote/cluster_start", {"all": "true"}),
+        "stop":  ("/remote/cluster_stop",  {"all": "true"}),
     }
-    if action not in argv_map:
+    if action not in action_map:
         return jsonify({"ok": False, "error": "Неизвестное действие"}), 400
-    return _pcs_action_run(cid, argv_map[action], f"cluster {action} --all")
+    path, form = action_map[action]
+    return _pcs_action_run(cid, path, form, f"cluster {action} --all")
 
 
 # ===== Группы (плечи) =====

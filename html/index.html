@@ -5591,9 +5591,9 @@
             const cards = (items || []).map(c => `
                 <div class="cred-card">
                     <div class="cred-card-title">${escapeHtml(c.name)}</div>
-                    <div class="cred-card-sub">SSH ${escapeHtml(c.ssh_login || '?')}@${escapeHtml(c.host || '?')}:${c.ssh_port || 22}
+                    <div class="cred-card-sub">pcsd https://${escapeHtml(c.host || '?')}:${c.ssh_port || 2224}
+                        · пользователь <b>${escapeHtml(c.ssh_login || '?')}</b>
                         · ${c.ssh_password_set ? 'пароль ✓' : '<span style="color:#fca5a5">пароль не задан</span>'}
-                        · ${c.ssh_sudo_pwd_set ? 'sudo ✓' : '<span style="color:#fca5a5">sudo не задан</span>'}
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
                         <button type="button" class="btn btn-ghost" onclick="openPcsClusterEditor(${c.id})">Редактировать</button>
@@ -5622,7 +5622,7 @@
                 <div class="modal-backdrop open" id="pcsClusterBackdrop" onclick="if(event.target===this) closePcsClusterEditor()">
                     <div class="modal" style="max-width:560px">
                         <div class="modal-title">${isEdit ? 'Редактировать кластер' : 'Новый кластер'}</div>
-                        <div class="modal-sub">SSH к одной из нод кластера. Пароль и sudo-пароль шифруются.</div>
+                        <div class="modal-sub">Подключение к pcsd по HTTPS на порт 2224. Те же логин/пароль, что вы используете в веб-интерфейсе pcsd.</div>
                         <form id="pcsClusterForm" onsubmit="return savePcsClusterFromForm(event, ${isEdit ? item.id : 'null'})">
                             <div class="field">
                                 <label>Имя (метка)</label>
@@ -5634,21 +5634,17 @@
                             </div>
                             <div class="field" style="display:flex;gap:10px">
                                 <div style="flex:2">
-                                    <label>SSH-логин</label>
-                                    <input type="text" id="pcsClLogin" required value="${escapeHtml(item ? item.ssh_login : '')}" autocomplete="off">
+                                    <label>Пользователь pcsd</label>
+                                    <input type="text" id="pcsClLogin" required value="${escapeHtml(item ? item.ssh_login : '')}" autocomplete="off" placeholder="hacluster">
                                 </div>
                                 <div style="flex:1">
-                                    <label>SSH-порт</label>
-                                    <input type="number" id="pcsClPort" min="1" max="65535" value="${item ? item.ssh_port : 22}">
+                                    <label>Порт</label>
+                                    <input type="number" id="pcsClPort" min="1" max="65535" value="${item ? item.ssh_port : 2224}">
                                 </div>
                             </div>
                             <div class="field">
-                                <label>SSH-пароль ${isEdit ? '<span class="muted">(оставьте пустым, чтобы не менять)</span>' : ''}</label>
+                                <label>Пароль ${isEdit ? '<span class="muted">(оставьте пустым, чтобы не менять)</span>' : ''}</label>
                                 <input type="password" id="pcsClPwd" autocomplete="new-password">
-                            </div>
-                            <div class="field">
-                                <label>Sudo-пароль ${isEdit ? '<span class="muted">(оставьте пустым, чтобы не менять)</span>' : '<span class="muted">— обычно тот же, что и SSH</span>'}</label>
-                                <input type="password" id="pcsClSudo" autocomplete="new-password">
                             </div>
                             <div class="modal-error" id="pcsClError" style="display:none;color:#fca5a5;margin:8px 0"></div>
                             <div class="modal-actions" style="justify-content:space-between">
@@ -5681,9 +5677,8 @@
                 name:       document.getElementById('pcsClName').value.trim(),
                 host:       document.getElementById('pcsClHost').value.trim(),
                 ssh_login:  document.getElementById('pcsClLogin').value.trim(),
-                ssh_port:   parseInt(document.getElementById('pcsClPort').value || '22', 10),
+                ssh_port:   parseInt(document.getElementById('pcsClPort').value || '2224', 10),
                 ssh_password: document.getElementById('pcsClPwd').value,
-                ssh_sudo_pwd: document.getElementById('pcsClSudo').value,
             };
             const url    = id ? `/api/pcs/clusters/${id}` : '/api/pcs/clusters';
             const method = id ? 'PATCH' : 'POST';
@@ -5738,7 +5733,12 @@
                 const data = await resp.json().catch(() => ({}));
                 if (out) {
                     if (data.ok) {
-                        out.textContent = '✓ ' + (data.version || 'OK');
+                        const parts = [];
+                        if (data.cluster_name) parts.push(`кластер «${data.cluster_name}»`);
+                        if (typeof data.nodes === 'number') parts.push(`нод: ${data.nodes}`);
+                        if (typeof data.resources === 'number') parts.push(`ресурсов: ${data.resources}`);
+                        if (data.with_quorum !== undefined) parts.push(data.with_quorum ? 'кворум есть' : 'кворума нет');
+                        out.textContent = '✓ ' + (parts.join(', ') || 'OK');
                         out.style.color = '#86efac';
                     } else {
                         out.textContent = '✗ ' + (data.error || `HTTP ${resp.status}`);
