@@ -2028,7 +2028,6 @@
                 <div class="page-header">
                     <div>
                         <h1 class="page-title">Кластеры (Pacemaker)</h1>
-                        <div class="page-sub">Просмотр статуса HA-кластера и управление ресурсами/нодами через <code>pcs</code> по SSH</div>
                     </div>
                 </div>
                 <div id="pcsClustersArea"><div class="muted">Загрузка…</div></div>
@@ -5854,19 +5853,19 @@
                 ].filter(Boolean).join(' ');
                 return `
                     <tr>
-                        <td style="${PCS_TD_STYLE};font-family:ui-monospace,monospace">${escapeHtml(n.name)}</td>
-                        <td style="${PCS_TD_STYLE};color:${stateColor};font-weight:500">${state}</td>
-                        <td style="${PCS_TD_STYLE};text-align:center;width:80px">${n.resources_running}</td>
-                        <td style="${PCS_TD_STYLE};white-space:nowrap;width:1%">${actions}</td>
+                        <td style="${PCS_TD_STYLE};font-family:ui-monospace,monospace;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(n.name)}</td>
+                        <td style="${PCS_TD_STYLE};color:${stateColor};font-weight:500;width:80px;white-space:nowrap">${state}</td>
+                        <td style="${PCS_TD_STYLE};text-align:center;width:60px">${n.resources_running}</td>
+                        <td style="${PCS_TD_STYLE};white-space:nowrap">${actions}</td>
                     </tr>`;
             }).join('');
             const nodesTable = `
                 <h3 style="margin:6px 0 10px;font-size:14px;font-weight:600;color:#c7d2fe">Ноды</h3>
                 <table style="${PCS_TABLE_STYLE};margin-bottom:18px">
                     <thead><tr>
-                        <th style="${PCS_TH_STYLE}">Нода</th>
-                        <th style="${PCS_TH_STYLE}">Состояние</th>
-                        <th style="${PCS_TH_STYLE};text-align:center">Ресурсов</th>
+                        <th style="${PCS_TH_STYLE};max-width:180px">Нода</th>
+                        <th style="${PCS_TH_STYLE};width:80px">Состояние</th>
+                        <th style="${PCS_TH_STYLE};text-align:center;width:60px">Ресурсов</th>
                         <th style="${PCS_TH_STYLE}">Действия</th>
                     </tr></thead>
                     <tbody>${nodesRows || `<tr><td colspan="4" class="muted" style="${PCS_TD_STYLE};text-align:center">— нет данных —</td></tr>`}</tbody>
