@@ -5619,7 +5619,7 @@
             const item = id ? (_pcsState.items.find(x => x.id === id) || null) : null;
             const isEdit = !!item;
             const modalHtml = `
-                <div class="modal-backdrop show" id="pcsClusterBackdrop" onclick="if(event.target===this) closePcsClusterEditor()">
+                <div class="modal-backdrop open" id="pcsClusterBackdrop" onclick="if(event.target===this) closePcsClusterEditor()">
                     <div class="modal" style="max-width:560px">
                         <div class="modal-title">${isEdit ? 'Редактировать кластер' : 'Новый кластер'}</div>
                         <div class="modal-sub">SSH к одной из нод кластера. Пароль и sudo-пароль шифруются.</div>
@@ -6124,13 +6124,8 @@
                 const resp = await fetch('/api/balancer-credentials');
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const c = await resp.json();
-                const updatedTxt = c.updated_at
-                    ? `последнее обновление: ${new Date(c.updated_at * 1000).toLocaleString('ru-RU')} (${escapeHtml(c.updated_by || '?')})`
-                    : 'ещё не настроено';
                 root.innerHTML = `
                     <div style="max-width:640px">
-                        <div class="muted" style="margin-bottom:14px;font-size:11px">${updatedTxt}</div>
-
                         <div class="cred-card">
                             <div class="cred-card-head">
                                 <span class="cred-card-icon">🔗</span>
