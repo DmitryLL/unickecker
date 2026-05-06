@@ -3202,34 +3202,57 @@ def pcs_cluster_decrypt(row):
 
 
 def _pcsd_login(c, timeout=10):
-    """Логин в pcsd. Возвращает (requests.Session, base_url) или кидает BalancerError."""
+    """Логин в pcsd. Возвращает (requests.Session, base_url) или кидает BalancerError.
+    Пробуем оба пути (/ui/login для новых pcsd 0.10+, /login для старых 0.9.x).
+    Cookie может называться token или pcsd.sid в зависимости от версии."""
     if requests is None:
         raise BalancerError("requests не установлен")
     if not c or not c.get("host") or not c.get("user"):
         raise BalancerError("Подключение к pcsd не настроено")
     base = f"https://{c['host']}:{int(c.get('port') or 2224)}"
     sess = requests.Session()
-    sess.verify = False  # pcsd обычно с самоподписанным сертификатом
+    sess.verify = False
+    sess.headers.update({
+        "User-Agent": "unichecker-pcs/1.0",
+        "Accept":     "application/json, text/html;q=0.9, */*;q=0.5",
+    })
     try:
-        # Глушим InsecureRequestWarning (self-signed)
+        from urllib3.exceptions import InsecureRequestWarning
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    except Exception:
+        pass
+
+    last = {"path": None, "rc": None, "body": "", "err": None}
+    for path in ("/ui/login", "/login"):
         try:
-            from urllib3.exceptions import InsecureRequestWarning
-            requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-        except Exception:
-            pass
-        r = sess.post(
-            f"{base}/ui/login",
-            data={"username": c["user"], "password": c.get("password") or ""},
-            timeout=timeout,
-            allow_redirects=False,
-        )
-    except Exception as e:
-        raise BalancerError(f"Подключение к {base}: {e}")
-    if r.status_code not in (200, 302):
-        raise BalancerError(f"Логин в pcsd: HTTP {r.status_code}")
-    if not sess.cookies.get("token"):
-        raise BalancerError("Логин в pcsd: неверный пользователь или пароль")
-    return sess, base
+            r = sess.post(
+                f"{base}{path}",
+                data={"username": c["user"], "password": c.get("password") or ""},
+                timeout=timeout,
+                allow_redirects=False,
+            )
+        except Exception as e:
+            last = {"path": path, "rc": None, "body": "", "err": str(e)}
+            continue
+        last = {
+            "path": path,
+            "rc":   r.status_code,
+            "body": (r.text or "")[:200],
+            "err":  None,
+        }
+        if r.status_code not in (200, 302, 303):
+            continue
+        # cookie токена в разных версиях именуется по-разному
+        for cn in ("token", "pcsd.sid", "rack.session"):
+            if sess.cookies.get(cn):
+                return sess, base
+    # Сюда попадаем только если оба пути не сработали
+    if last["err"]:
+        raise BalancerError(f"Подключение к {base}{last['path'] or ''}: {last['err']}")
+    raise BalancerError(
+        f"Логин в pcsd ({last['path']}): HTTP {last['rc']}, "
+        f"cookie не получена. Тело ответа: {last['body']!r}"
+    )
 
 
 def _pcsd_get(sess, base, path, timeout=PCS_DEFAULT_TIMEOUT, params=None):
