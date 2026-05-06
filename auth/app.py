@@ -3261,101 +3261,113 @@ def _pcsd_post(sess, base, path, data=None, timeout=60):
 
 
 def _pcs_parse_status_json(data):
-    """Нормализует ответ /remote/cluster_status в наш единый формат."""
+    """Нормализует ответ pcsd /remote/cluster_status в наш формат.
+    Опирается на формат, который отдаёт pcsd 0.10+ (RHEL 8/9): ресурсы в
+    resource_list, состояние в r['crm_status'][i], нода в r['crm_status'][i]['node']['name'].
+    Для нод используются как поле n['status'], так и верхнеуровневые
+    массивы pacemaker_online / pacemaker_offline / pacemaker_standby."""
     if not isinstance(data, dict):
         return {"ok": False, "error": "Ответ pcsd не похож на словарь"}
+
     summary = {
-        "dc":                   data.get("dc_name") or "",
         "with_quorum":          bool(data.get("quorate", data.get("quorum", False))),
         "nodes_configured":     None,
         "resources_configured": None,
-        "stack":                data.get("stack") or "",
         "cluster_name":         data.get("cluster_name") or "",
     }
-    nodes_in = data.get("node_list") or []
+
+    standby_set = set(data.get("pacemaker_standby") or [])
+    offline_set = set(data.get("pacemaker_offline") or [])
+
     nodes_out = []
-    for n in nodes_in:
+    for n in data.get("node_list") or []:
         if not isinstance(n, dict):
             continue
-        # Поля и их ключи различаются между версиями pcsd. Берём с фолбэками.
+        name = n.get("name") or n.get("uname") or ""
+        n_status = (n.get("status") or "").lower()
+        is_standby = name in standby_set or n_status == "standby"
+        is_offline = (
+            name in offline_set
+            or n_status == "offline"
+            or n.get("pacemaker") is False
+        )
+        is_online = (n_status == "online" or n.get("pacemaker") is True) and not is_offline
+        # standby — это «онлайн, но выведен из ротации»
+        if is_standby:
+            is_online = True
+            is_offline = False
         nodes_out.append({
-            "name":           n.get("name") or n.get("uname") or "",
-            "online":         bool(n.get("online", True)) and not n.get("offline", False),
-            "standby":        bool(n.get("standby") or (n.get("node_attr") or {}).get("standby") == "on"),
-            "standby_onfail": bool(n.get("standby_onfail") or False),
-            "maintenance":    bool(n.get("maintenance") or False),
-            "unclean":        bool(n.get("unclean") or False),
-            "shutdown":       bool(n.get("shutdown") or False),
-            "type":           n.get("type") or "",
+            "name":              name,
+            "online":            is_online,
+            "standby":           is_standby,
+            "maintenance":       bool(n.get("maintenance", False)),
             "resources_running": int(n.get("resources_running") or 0),
         })
-    summary["nodes_configured"] = len(nodes_out) if nodes_out else (data.get("node_count") or 0)
+    summary["nodes_configured"] = len(nodes_out)
 
-    # Ресурсы. В /remote/cluster_status формат различается между версиями pcsd:
-    # одни кладут плоский resource_list, другие — вложенный resources с rsc_list.
-    def _walk_resources(seq, parent):
+    def _flatten(seq, parent_id):
+        """Рекурсивно обходит resource_list, разворачивает group/clone-обёртки."""
         for r in seq or []:
             if not isinstance(r, dict):
                 continue
-            kids = r.get("rsc_list") or r.get("resources") or []
-            if kids and not r.get("id"):
-                # это группа / clone без своего id, пройдём по детям
-                gname = r.get("group_id") or r.get("clone_id") or r.get("id") or ""
-                kind = r.get("class_type") or ("group" if r.get("group_id") else "clone")
-                yield from _walk_resources(kids, f"{kind}:{gname}" if gname else parent)
+            kids = r.get("rsc_list") or r.get("resources") or r.get("members") or []
+            ct = (r.get("class_type") or "").lower()
+            if kids and ct in ("group", "clone", "master", "bundle"):
+                yield from _flatten(kids, r.get("id") or parent_id)
                 continue
-            nodes_running = []
-            raw_nodes = (
-                r.get("nodes_running_on")
-                or r.get("nodes")
-                or r.get("location")
-                or r.get("running_on")
-                or []
-            )
-            for nn in raw_nodes:
-                if isinstance(nn, dict):
-                    nodes_running.append(nn.get("name") or nn.get("uname") or nn.get("id") or "")
-                elif isinstance(nn, str):
-                    nodes_running.append(nn)
-            # роль/состояние: пробуем несколько ключей
-            role = (
-                r.get("role")
-                or r.get("status")
-                or r.get("state")
-                or r.get("resource_status")
-                or ""
-            )
-            if not role:
-                if r.get("active") or nodes_running:
-                    role = "Started"
-                elif r.get("orphaned"):
-                    role = "Orphaned"
-                else:
-                    role = "Stopped"
-            # вложенность
-            mine_parent = parent
-            if not mine_parent:
-                if r.get("group"):
-                    mine_parent = f"group:{r['group']}"
-                elif r.get("clone_id") or r.get("clone"):
-                    mine_parent = f"clone:{r.get('clone_id') or r.get('clone')}"
-            yield {
-                "id":              r.get("id") or "",
-                "agent":           r.get("resource_agent") or r.get("agentname") or r.get("agent") or r.get("type") or "",
-                "role":            str(role),
-                "active":          bool(r.get("active") or nodes_running),
-                "managed":         bool(r.get("managed", True)),
-                "failed":          bool(r.get("failed") or False),
-                "failure_ignored": bool(r.get("failure_ignored") or False),
-                "nodes":           [n for n in nodes_running if n],
-                "parent":          mine_parent,
-            }
-            # рекурсия (вложенные группы внутри clone и т.п.)
-            if kids:
-                yield from _walk_resources(kids, mine_parent)
+            yield r, parent_id
 
-    res_in = data.get("resource_list") or data.get("resources") or []
-    resources_out = list(_walk_resources(res_in, None))
+    resources_out = []
+    for r, walk_parent in _flatten(data.get("resource_list") or [], None):
+        crm_list = r.get("crm_status") if isinstance(r.get("crm_status"), list) else []
+        roles, nodes_running = [], []
+        any_active = any_failed = False
+        all_managed = True
+        for c in crm_list:
+            if not isinstance(c, dict):
+                continue
+            if c.get("role"):
+                roles.append(c["role"])
+            nd = c.get("node")
+            if isinstance(nd, dict) and nd.get("name"):
+                nodes_running.append(nd["name"])
+            elif isinstance(nd, str) and nd:
+                nodes_running.append(nd)
+            if c.get("active"):
+                any_active = True
+            if c.get("failed"):
+                any_failed = True
+            if c.get("managed") is False:
+                all_managed = False
+
+        # Сводная роль: Master > Started > первая непустая > Stopped
+        if "Master" in roles:
+            role = "Master"
+        elif "Started" in roles:
+            role = "Started"
+        elif roles:
+            role = next((x for x in roles if x), "Stopped")
+        else:
+            role = "Stopped"
+        # Disabled (admin off) перекрывает всё
+        if r.get("disabled"):
+            role = "Disabled"
+
+        # parent_id из ресурса важнее, чем родитель из обхода
+        parent = r.get("parent_id") or walk_parent or None
+
+        resources_out.append({
+            "id":              r.get("id") or "",
+            "agent":           r.get("agentname") or r.get("resource_agent") or r.get("type") or "",
+            "role":            role,
+            "active":          any_active,
+            "managed":         all_managed,
+            "failed":          any_failed,
+            "failure_ignored": False,
+            "nodes":           nodes_running,
+            "parent":          parent,
+        })
+
     summary["resources_configured"] = len(resources_out)
     return {"ok": True, "summary": summary, "nodes": nodes_out, "resources": resources_out}
 
