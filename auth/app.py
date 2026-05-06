@@ -3201,10 +3201,32 @@ def pcs_cluster_decrypt(row):
     }
 
 
+def _pcsd_auth_ok(sess, base, timeout=8):
+    """Проверка, что сессия реально авторизована. Делаем GET /remote/cluster_status:
+    если pcsd вернул JSON с данными — мы внутри. Если 401 / неверный JSON / редирект
+    на /login — нет."""
+    try:
+        r = sess.get(f"{base}/remote/cluster_status", timeout=timeout, allow_redirects=False)
+    except Exception:
+        return False, None
+    if r.status_code != 200:
+        return False, r
+    body = (r.text or "").strip()
+    if not body or body.startswith("<"):
+        return False, r
+    if '"notauthorized"' in body:
+        return False, r
+    try:
+        json.loads(body)
+    except Exception:
+        return False, r
+    return True, r
+
+
 def _pcsd_login(c, timeout=10):
     """Логин в pcsd. Возвращает (requests.Session, base_url) или кидает BalancerError.
-    Пробуем оба пути (/ui/login для новых pcsd 0.10+, /login для старых 0.9.x).
-    Cookie может называться token или pcsd.sid в зависимости от версии."""
+    Пробуем оба пути (/ui/login и /login). Успех проверяем не по cookie (она
+    может быть выставлена до auth), а пробным запросом /remote/cluster_status."""
     if requests is None:
         raise BalancerError("requests не установлен")
     if not c or not c.get("host") or not c.get("user"):
@@ -3222,7 +3244,7 @@ def _pcsd_login(c, timeout=10):
     except Exception:
         pass
 
-    last = {"path": None, "rc": None, "body": "", "err": None}
+    diagnostics = []
     for path in ("/ui/login", "/login"):
         try:
             r = sess.post(
@@ -3232,27 +3254,24 @@ def _pcsd_login(c, timeout=10):
                 allow_redirects=False,
             )
         except Exception as e:
-            last = {"path": path, "rc": None, "body": "", "err": str(e)}
+            diagnostics.append(f"POST {path}: сеть/таймаут: {e}")
             continue
-        last = {
-            "path": path,
-            "rc":   r.status_code,
-            "body": (r.text or "")[:200],
-            "err":  None,
-        }
-        if r.status_code not in (200, 302, 303):
+        loc = r.headers.get("Location") or ""
+        diagnostics.append(
+            f"POST {path}: HTTP {r.status_code}"
+            + (f", Location={loc}" if loc else "")
+            + f", body[:120]={(r.text or '')[:120]!r}"
+        )
+        # «Жёсткие» отказы — не пробуем дальше через этот path
+        if r.status_code == 401:
             continue
-        # cookie токена в разных версиях именуется по-разному
-        for cn in ("token", "pcsd.sid", "rack.session"):
-            if sess.cookies.get(cn):
-                return sess, base
-    # Сюда попадаем только если оба пути не сработали
-    if last["err"]:
-        raise BalancerError(f"Подключение к {base}{last['path'] or ''}: {last['err']}")
-    raise BalancerError(
-        f"Логин в pcsd ({last['path']}): HTTP {last['rc']}, "
-        f"cookie не получена. Тело ответа: {last['body']!r}"
-    )
+        if r.status_code in (302, 303) and loc.rstrip("/").endswith("/login"):
+            continue
+        # Возможно успех — проверим пробным запросом
+        ok, _probe = _pcsd_auth_ok(sess, base)
+        if ok:
+            return sess, base
+    raise BalancerError("Логин в pcsd не прошёл. Детали:\n  " + "\n  ".join(diagnostics))
 
 
 def _pcsd_get(sess, base, path, timeout=PCS_DEFAULT_TIMEOUT, params=None):
