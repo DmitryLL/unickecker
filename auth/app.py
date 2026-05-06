@@ -3201,32 +3201,14 @@ def pcs_cluster_decrypt(row):
     }
 
 
-def _pcsd_auth_ok(sess, base, timeout=8):
-    """Проверка, что сессия реально авторизована. Делаем GET /remote/cluster_status:
-    если pcsd вернул JSON с данными — мы внутри. Если 401 / неверный JSON / редирект
-    на /login — нет."""
-    try:
-        r = sess.get(f"{base}/remote/cluster_status", timeout=timeout, allow_redirects=False)
-    except Exception:
-        return False, None
-    if r.status_code != 200:
-        return False, r
-    body = (r.text or "").strip()
-    if not body or body.startswith("<"):
-        return False, r
-    if '"notauthorized"' in body:
-        return False, r
-    try:
-        json.loads(body)
-    except Exception:
-        return False, r
-    return True, r
-
-
 def _pcsd_login(c, timeout=10):
-    """Логин в pcsd. Возвращает (requests.Session, base_url) или кидает BalancerError.
-    Пробуем оба пути (/ui/login и /login). Успех проверяем не по cookie (она
-    может быть выставлена до auth), а пробным запросом /remote/cluster_status."""
+    """Логин в pcsd через POST /remote/auth — то же, что делает pcs CLI.
+    Возвращает (requests.Session, base_url) или кидает BalancerError.
+
+    Cookie-сессия (/login) даёт доступ только к HTML-страницам /manage; для
+    /remote/* эндпоинтов нужен токен из /remote/auth, который кладётся в
+    cookie token. Вернётся пустое тело при неверных кредах.
+    """
     if requests is None:
         raise BalancerError("requests не установлен")
     if not c or not c.get("host") or not c.get("user"):
@@ -3234,44 +3216,32 @@ def _pcsd_login(c, timeout=10):
     base = f"https://{c['host']}:{int(c.get('port') or 2224)}"
     sess = requests.Session()
     sess.verify = False
-    sess.headers.update({
-        "User-Agent": "unichecker-pcs/1.0",
-        "Accept":     "application/json, text/html;q=0.9, */*;q=0.5",
-    })
+    sess.headers.update({"User-Agent": "unichecker-pcs/1.0"})
     try:
         from urllib3.exceptions import InsecureRequestWarning
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
     except Exception:
         pass
 
-    diagnostics = []
-    for path in ("/ui/login", "/login"):
-        try:
-            r = sess.post(
-                f"{base}{path}",
-                data={"username": c["user"], "password": c.get("password") or ""},
-                timeout=timeout,
-                allow_redirects=False,
-            )
-        except Exception as e:
-            diagnostics.append(f"POST {path}: сеть/таймаут: {e}")
-            continue
-        loc = r.headers.get("Location") or ""
-        diagnostics.append(
-            f"POST {path}: HTTP {r.status_code}"
-            + (f", Location={loc}" if loc else "")
-            + f", body[:120]={(r.text or '')[:120]!r}"
+    try:
+        r = sess.post(
+            f"{base}/remote/auth",
+            data={"username": c["user"], "password": c.get("password") or ""},
+            timeout=timeout,
+            allow_redirects=False,
         )
-        # «Жёсткие» отказы — не пробуем дальше через этот path
-        if r.status_code == 401:
-            continue
-        if r.status_code in (302, 303) and loc.rstrip("/").endswith("/login"):
-            continue
-        # Возможно успех — проверим пробным запросом
-        ok, _probe = _pcsd_auth_ok(sess, base)
-        if ok:
-            return sess, base
-    raise BalancerError("Логин в pcsd не прошёл. Детали:\n  " + "\n  ".join(diagnostics))
+    except Exception as e:
+        raise BalancerError(f"Подключение к {base}/remote/auth: {e}")
+    if r.status_code != 200:
+        raise BalancerError(
+            f"Логин в pcsd: HTTP {r.status_code}, тело: {(r.text or '')[:120]!r}"
+        )
+    token = (r.text or "").strip()
+    # Корректный токен — длинная hex/alnum-строка. Пустое тело = неверный пароль.
+    if not token or len(token) < 16 or "\n" in token or " " in token:
+        raise BalancerError("Логин в pcsd: неверный пользователь или пароль")
+    sess.cookies.set("token", token)
+    return sess, base
 
 
 def _pcsd_get(sess, base, path, timeout=PCS_DEFAULT_TIMEOUT, params=None):
