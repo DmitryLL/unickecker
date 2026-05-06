@@ -5605,10 +5605,11 @@
             `).join('');
             const empty = items.length ? '' : `<div class="muted" style="margin-bottom:10px">Кластеры не настроены.</div>`;
             return `
-                <div class="cred-section-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
-                    <div>Кластеры Pacemaker (SSH)</div>
-                    <button type="button" class="btn btn-primary" onclick="openPcsClusterEditor(null)">+ Добавить кластер</button>
-                </div>
+                <div class="cred-section-title" style="margin-bottom:8px">Кластеры Pacemaker (SSH)</div>
+                <button type="button" class="btn btn-primary" onclick="openPcsClusterEditor(null)" style="margin-bottom:14px">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Добавить кластер
+                </button>
                 ${empty}
                 ${cards}
             `;
