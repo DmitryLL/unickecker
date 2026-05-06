@@ -60,6 +60,7 @@ ROUTES = [
     {"key": "services",      "title": "Службы",            "group": "main"},
     {"key": "Balancer",      "title": "Балансировка",      "group": "main"},
     {"key": "stunnel",       "title": "Stunnel",           "group": "main"},
+    {"key": "pcs_clusters",  "title": "Кластеры",          "group": "main"},
     {"key": "users",            "title": "Пользователи",         "group": "settings", "admin_only": True},
     {"key": "db_connection",    "title": "Подключение к БД",     "group": "settings"},
     {"key": "ms_catalog",       "title": "Каталог микросервисов","group": "settings"},
@@ -369,6 +370,23 @@ def init_db():
         "INSERT OR IGNORE INTO balancer_credentials (id, updated_at) VALUES (1, ?)",
         (_now,),
     )
+
+    # Кластеры Pacemaker (управление через SSH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pcs_clusters (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            name            TEXT UNIQUE NOT NULL,
+            host            TEXT NOT NULL DEFAULT '',
+            ssh_port        INTEGER NOT NULL DEFAULT 22,
+            ssh_login       TEXT NOT NULL DEFAULT '',
+            ssh_password    TEXT NOT NULL DEFAULT '',
+            ssh_sudo_pwd    TEXT NOT NULL DEFAULT '',
+            position        INTEGER NOT NULL DEFAULT 0,
+            created_at      INTEGER NOT NULL,
+            updated_at      INTEGER NOT NULL,
+            updated_by      TEXT
+        )
+    """)
 
     # Страница «О программе» (одна запись, редактирует только admin)
     conn.execute("""
@@ -3148,6 +3166,422 @@ def get_balancer_creds():
         "stunnel_brs_password": decrypt_secret(row["stunnel_brs_password"]),
         "stunnel_brs_sudo_pwd": decrypt_secret(row["stunnel_brs_sudo_pwd"]),
     }
+
+
+# ===== PCS (Pacemaker) clusters =====
+# Управление HA-кластером по SSH: status / enable / disable / restart / cleanup,
+# standby / unstandby, cluster start --all / stop --all. Все имена ресурсов и
+# нод валидируются регексом и проверяются по живому `pcs status xml`,
+# чтобы исключить инъекции в shell.
+PCS_NAME_RE = re.compile(r"^[A-Za-z0-9_.:\-]{1,64}$")
+PCS_DEFAULT_TIMEOUT = 20
+
+
+def _pcs_safe_name(s):
+    return bool(s) and bool(PCS_NAME_RE.match(s))
+
+
+def pcs_cluster_row(cid):
+    return db().execute("SELECT * FROM pcs_clusters WHERE id = ?", (int(cid),)).fetchone()
+
+
+def pcs_cluster_decrypt(row):
+    """Принимает sqlite3.Row → dict с расшифрованными паролями."""
+    if not row:
+        return None
+    return {
+        "id":           row["id"],
+        "name":         row["name"] or "",
+        "host":         row["host"] or "",
+        "ssh_port":     row["ssh_port"] or 22,
+        "ssh_login":    row["ssh_login"] or "",
+        "ssh_password": decrypt_secret(row["ssh_password"]),
+        "ssh_sudo_pwd": decrypt_secret(row["ssh_sudo_pwd"]),
+    }
+
+
+def _pcs_open(c):
+    """SSH-коннект к ноде кластера. c — расшифрованный dict."""
+    if not c or not c.get("host") or not c.get("ssh_login"):
+        raise BalancerError("SSH-учётка кластера не настроена")
+    return _ssh_connect(c["host"], c.get("ssh_port"),
+                        c["ssh_login"], c.get("ssh_password"))
+
+
+def _pcs_exec(client, sudo_pwd, argv, timeout=PCS_DEFAULT_TIMEOUT):
+    """Запуск `sudo pcs <argv...>`. argv — список валидированных аргументов.
+    Возвращает (rc, stdout, stderr)."""
+    cmd = "pcs " + " ".join(shlex.quote(a) for a in argv)
+    return _ssh_run_sudo(client, sudo_pwd or "", cmd, timeout=timeout)
+
+
+def _pcs_exec_raw(client, sudo_pwd, raw_cmd, timeout=PCS_DEFAULT_TIMEOUT):
+    """Запуск произвольной команды (например, journalctl) под sudo."""
+    return _ssh_run_sudo(client, sudo_pwd or "", raw_cmd, timeout=timeout)
+
+
+def _pcs_parse_status_xml(xml_text):
+    """Парсит вывод `pcs status xml` в нормализованный dict.
+    Возвращает: {ok, summary, nodes, resources, error?}.
+    """
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(xml_text)
+    except Exception as e:
+        return {"ok": False, "error": f"Не удалось распарсить XML: {e}", "raw": xml_text[:1000]}
+
+    summary = {}
+    s = root.find("./summary")
+    if s is not None:
+        cur = s.find("./current_dc")
+        if cur is not None:
+            summary["dc"] = cur.attrib.get("name") or ""
+            summary["with_quorum"] = cur.attrib.get("with_quorum") == "true"
+        nc = s.find("./nodes_configured")
+        if nc is not None:
+            summary["nodes_configured"] = int(nc.attrib.get("number") or 0)
+        rc = s.find("./resources_configured")
+        if rc is not None:
+            summary["resources_configured"] = int(rc.attrib.get("number") or 0)
+        v = s.find("./stack")
+        if v is not None:
+            summary["stack"] = v.attrib.get("type") or ""
+
+    nodes_out = []
+    for n in root.findall("./nodes/node"):
+        nodes_out.append({
+            "name":           n.attrib.get("name") or "",
+            "online":         n.attrib.get("online") == "true",
+            "standby":        n.attrib.get("standby") == "true",
+            "standby_onfail": n.attrib.get("standby_onfail") == "true",
+            "maintenance":    n.attrib.get("maintenance") == "true",
+            "unclean":        n.attrib.get("unclean") == "true",
+            "shutdown":       n.attrib.get("shutdown") == "true",
+            "type":           n.attrib.get("type") or "",
+            "resources_running": int(n.attrib.get("resources_running") or 0),
+        })
+
+    def _mk_res(rnode, parent=None):
+        return {
+            "id":            rnode.attrib.get("id") or "",
+            "agent":         rnode.attrib.get("resource_agent") or "",
+            "role":          rnode.attrib.get("role") or "",
+            "active":        rnode.attrib.get("active") == "true",
+            "managed":       rnode.attrib.get("managed") == "true",
+            "failed":        rnode.attrib.get("failed") == "true",
+            "failure_ignored": rnode.attrib.get("failure_ignored") == "true",
+            "nodes":         [nn.attrib.get("name") for nn in rnode.findall("./node")],
+            "parent":        parent,
+        }
+
+    resources_out = []
+    rs = root.find("./resources")
+    if rs is not None:
+        for r in rs.findall("./resource"):
+            resources_out.append(_mk_res(r))
+        for grp in rs.findall("./group"):
+            gname = grp.attrib.get("id") or ""
+            for r in grp.findall("./resource"):
+                resources_out.append(_mk_res(r, parent=f"group:{gname}"))
+        for cl in rs.findall("./clone"):
+            cname = cl.attrib.get("id") or ""
+            for r in cl.findall("./resource"):
+                resources_out.append(_mk_res(r, parent=f"clone:{cname}"))
+
+    return {"ok": True, "summary": summary, "nodes": nodes_out, "resources": resources_out}
+
+
+def _pcs_status_snapshot(client, sudo_pwd):
+    """Один снапшот: pcs status xml + parsed."""
+    rc, out, err = _pcs_exec(client, sudo_pwd, ["status", "xml"])
+    if rc != 0:
+        return {"ok": False, "error": (err or out or f"pcs status xml rc={rc}").strip()}
+    snap = _pcs_parse_status_xml(out)
+    if not snap.get("ok"):
+        return snap
+    return snap
+
+
+# CRUD endpoints
+@app.get("/api/pcs/clusters")
+def pcs_clusters_list():
+    _, err = require_route("pcs_clusters")
+    if err: return err
+    rows = db().execute(
+        "SELECT id, name, host, ssh_port, ssh_login, ssh_password, ssh_sudo_pwd, "
+        "position, updated_at, updated_by "
+        "FROM pcs_clusters ORDER BY position, name"
+    ).fetchall()
+    return jsonify({"items": [{
+        "id":        r["id"],
+        "name":      r["name"],
+        "host":      r["host"] or "",
+        "ssh_port":  r["ssh_port"] or 22,
+        "ssh_login": r["ssh_login"] or "",
+        "ssh_password_set": bool(r["ssh_password"]),
+        "ssh_sudo_pwd_set": bool(r["ssh_sudo_pwd"]),
+        "position":   r["position"] or 0,
+        "updated_at": r["updated_at"] or 0,
+        "updated_by": r["updated_by"] or "",
+    } for r in rows]})
+
+
+@app.post("/api/pcs/clusters")
+def pcs_clusters_create():
+    u, err = require_route("pcs_clusters")
+    if err: return err
+    data = request.get_json(silent=True) or {}
+    name  = (data.get("name") or "").strip()
+    host  = (data.get("host") or "").strip()
+    login = (data.get("ssh_login") or "").strip()
+    if not name:
+        return jsonify({"error": "Имя обязательно"}), 400
+    if not host:
+        return jsonify({"error": "Хост обязателен"}), 400
+    if not login:
+        return jsonify({"error": "SSH-логин обязателен"}), 400
+    try:
+        port = int(data.get("ssh_port") or 22); assert 1 <= port <= 65535
+    except Exception:
+        return jsonify({"error": "ssh_port должен быть числом 1..65535"}), 400
+    conn = db()
+    if conn.execute("SELECT 1 FROM pcs_clusters WHERE name = ?", (name,)).fetchone():
+        return jsonify({"error": "Кластер с таким именем уже существует"}), 400
+    pos_row = conn.execute("SELECT COALESCE(MAX(position), -1) + 1 FROM pcs_clusters").fetchone()
+    pos = pos_row[0] if pos_row else 0
+    now = int(time.time())
+    pwd  = encrypt_secret(data.get("ssh_password") or "")
+    sudo = encrypt_secret(data.get("ssh_sudo_pwd") or data.get("ssh_password") or "")
+    cur = conn.execute(
+        "INSERT INTO pcs_clusters (name, host, ssh_port, ssh_login, ssh_password, ssh_sudo_pwd, "
+        "position, created_at, updated_at, updated_by) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (name, host, port, login, pwd, sudo, pos, now, now, u["username"]),
+    )
+    conn.commit()
+    ms_console_append("info", f"PCS: добавлен кластер «{name}» ({host})", u["username"])
+    return jsonify({"ok": True, "id": cur.lastrowid})
+
+
+@app.patch("/api/pcs/clusters/<int:cid>")
+def pcs_clusters_update(cid):
+    u, err = require_route("pcs_clusters")
+    if err: return err
+    row = db().execute("SELECT * FROM pcs_clusters WHERE id = ?", (cid,)).fetchone()
+    if not row:
+        return jsonify({"error": "Кластер не найден"}), 404
+    data = request.get_json(silent=True) or {}
+    fields, args = [], []
+    def upd(c, v): fields.append(f"{c} = ?"); args.append(v)
+    if "name" in data:
+        nm = (data["name"] or "").strip()
+        if not nm:
+            return jsonify({"error": "Имя обязательно"}), 400
+        if db().execute("SELECT 1 FROM pcs_clusters WHERE name = ? AND id <> ?", (nm, cid)).fetchone():
+            return jsonify({"error": "Кластер с таким именем уже существует"}), 400
+        upd("name", nm)
+    if "host" in data:      upd("host", (data["host"] or "").strip())
+    if "ssh_login" in data: upd("ssh_login", (data["ssh_login"] or "").strip())
+    if "ssh_port" in data:
+        try:
+            p = int(data["ssh_port"]); assert 1 <= p <= 65535
+        except Exception:
+            return jsonify({"error": "ssh_port должен быть числом 1..65535"}), 400
+        upd("ssh_port", p)
+    if "ssh_password" in data and (data["ssh_password"] or "") != "":
+        upd("ssh_password", encrypt_secret(data["ssh_password"]))
+    if "ssh_sudo_pwd" in data and (data["ssh_sudo_pwd"] or "") != "":
+        upd("ssh_sudo_pwd", encrypt_secret(data["ssh_sudo_pwd"]))
+    if not fields:
+        return jsonify({"ok": True, "noop": True})
+    fields.append("updated_at = ?"); args.append(int(time.time()))
+    fields.append("updated_by = ?"); args.append(u["username"])
+    args.append(cid)
+    conn = db()
+    conn.execute(f"UPDATE pcs_clusters SET {', '.join(fields)} WHERE id = ?", args)
+    conn.commit()
+    ms_console_append("info", f"PCS: обновлён кластер id={cid}", u["username"])
+    return jsonify({"ok": True})
+
+
+@app.delete("/api/pcs/clusters/<int:cid>")
+def pcs_clusters_delete(cid):
+    u, err = require_route("pcs_clusters")
+    if err: return err
+    conn = db()
+    row = conn.execute("SELECT name FROM pcs_clusters WHERE id = ?", (cid,)).fetchone()
+    if not row:
+        return jsonify({"error": "Кластер не найден"}), 404
+    conn.execute("DELETE FROM pcs_clusters WHERE id = ?", (cid,))
+    conn.commit()
+    ms_console_append("info", f"PCS: удалён кластер «{row['name']}»", u["username"])
+    return jsonify({"ok": True})
+
+
+@app.post("/api/pcs/clusters/<int:cid>/test")
+def pcs_clusters_test(cid):
+    _, err = require_route("pcs_clusters")
+    if err: return err
+    c = pcs_cluster_decrypt(pcs_cluster_row(cid))
+    if not c:
+        return jsonify({"ok": False, "error": "Кластер не найден"}), 404
+    try:
+        client = _pcs_open(c)
+    except BalancerError as e:
+        return jsonify({"ok": False, "error": str(e)}), 200
+    try:
+        rc1, ver_out, ver_err = _pcs_exec(client, c["ssh_sudo_pwd"], ["--version"])
+        if rc1 != 0:
+            return jsonify({"ok": False, "error": (ver_err or ver_out or "pcs --version failed").strip()})
+        rc2, st_out, st_err = _pcs_exec(client, c["ssh_sudo_pwd"], ["status", "nodes"])
+        if rc2 != 0:
+            return jsonify({"ok": False, "error": (st_err or st_out or "pcs status nodes failed").strip()})
+        return jsonify({"ok": True, "version": ver_out.strip(), "nodes_text": st_out.strip()})
+    finally:
+        try: client.close()
+        except Exception: pass
+
+
+@app.get("/api/pcs/clusters/<int:cid>/status")
+def pcs_clusters_status(cid):
+    _, err = require_route("pcs_clusters")
+    if err: return err
+    c = pcs_cluster_decrypt(pcs_cluster_row(cid))
+    if not c:
+        return jsonify({"ok": False, "error": "Кластер не найден"}), 404
+    try:
+        client = _pcs_open(c)
+    except BalancerError as e:
+        return jsonify({"ok": False, "error": str(e)}), 200
+    try:
+        snap = _pcs_status_snapshot(client, c["ssh_sudo_pwd"])
+        snap["host"] = c["host"]
+        snap["name"] = c["name"]
+        return jsonify(snap)
+    finally:
+        try: client.close()
+        except Exception: pass
+
+
+def _pcs_action_run(cid, argv, audit_msg):
+    """Общая логика endpoint'а действия. argv — список валидированных
+    pcs-аргументов. Возвращает (json_response, http_status)."""
+    u = current_user()
+    if u is None:
+        return jsonify({"ok": False, "error": "Не авторизован"}), 401
+    if "pcs_clusters" not in set(user_allowed_routes(u)):
+        return jsonify({"ok": False, "error": "Доступ запрещён"}), 403
+    c = pcs_cluster_decrypt(pcs_cluster_row(cid))
+    if not c:
+        return jsonify({"ok": False, "error": "Кластер не найден"}), 404
+    try:
+        client = _pcs_open(c)
+    except BalancerError as e:
+        return jsonify({"ok": False, "error": str(e)}), 200
+    try:
+        rc, out, err2 = _pcs_exec(client, c["ssh_sudo_pwd"], argv, timeout=60)
+        ok = (rc == 0)
+        ms_console_append(
+            "info" if ok else "err",
+            f"PCS [{c['name']}]: {audit_msg}" + ("" if ok else f" — ошибка: {(err2 or out or '').strip()[:200]}"),
+            u["username"],
+        )
+        return jsonify({
+            "ok": ok,
+            "rc": rc,
+            "output": (out or "").strip(),
+            "error":  "" if ok else (err2 or out or f"rc={rc}").strip(),
+        })
+    finally:
+        try: client.close()
+        except Exception: pass
+
+
+def _pcs_known_resource(cid, name):
+    """Проверяет что ресурс c таким id есть в текущем pcs status."""
+    c = pcs_cluster_decrypt(pcs_cluster_row(cid))
+    if not c: return False
+    try:
+        client = _pcs_open(c)
+    except BalancerError:
+        return False
+    try:
+        snap = _pcs_status_snapshot(client, c["ssh_sudo_pwd"])
+    finally:
+        try: client.close()
+        except Exception: pass
+    if not snap.get("ok"):
+        return False
+    return any(r["id"] == name for r in snap.get("resources", []))
+
+
+def _pcs_known_node(cid, name):
+    c = pcs_cluster_decrypt(pcs_cluster_row(cid))
+    if not c: return False
+    try:
+        client = _pcs_open(c)
+    except BalancerError:
+        return False
+    try:
+        snap = _pcs_status_snapshot(client, c["ssh_sudo_pwd"])
+    finally:
+        try: client.close()
+        except Exception: pass
+    if not snap.get("ok"):
+        return False
+    return any(n["name"] == name for n in snap.get("nodes", []))
+
+
+# Действия с ресурсом
+@app.post("/api/pcs/clusters/<int:cid>/resource/<res>/<action>")
+def pcs_resource_action(cid, res, action):
+    if not _pcs_safe_name(res):
+        return jsonify({"ok": False, "error": "Недопустимое имя ресурса"}), 400
+    action = (action or "").lower()
+    argv_map = {
+        "enable":  ["resource", "enable",  res],
+        "disable": ["resource", "disable", res],
+        "restart": ["resource", "restart", res],
+        "cleanup": ["resource", "cleanup", res],
+        "refresh": ["resource", "refresh", res],
+    }
+    if action not in argv_map:
+        return jsonify({"ok": False, "error": "Неизвестное действие"}), 400
+    if not _pcs_known_resource(cid, res):
+        return jsonify({"ok": False, "error": f"Ресурс «{res}» не найден в кластере"}), 404
+    return _pcs_action_run(cid, argv_map[action], f"resource {action} {res}")
+
+
+# Действия с нодой
+@app.post("/api/pcs/clusters/<int:cid>/node/<node>/<action>")
+def pcs_node_action(cid, node, action):
+    if not _pcs_safe_name(node):
+        return jsonify({"ok": False, "error": "Недопустимое имя ноды"}), 400
+    action = (action or "").lower()
+    argv_map = {
+        "standby":       ["node",    "standby",   node],
+        "unstandby":     ["node",    "unstandby", node],
+        "cluster-stop":  ["cluster", "stop",      node],
+        "cluster-start": ["cluster", "start",     node],
+    }
+    if action not in argv_map:
+        return jsonify({"ok": False, "error": "Неизвестное действие"}), 400
+    if not _pcs_known_node(cid, node):
+        return jsonify({"ok": False, "error": f"Нода «{node}» не найдена в кластере"}), 404
+    return _pcs_action_run(cid, argv_map[action], f"node {action} {node}")
+
+
+# Действия с кластером целиком
+@app.post("/api/pcs/clusters/<int:cid>/cluster/<action>")
+def pcs_cluster_action(cid, action):
+    action = (action or "").lower()
+    argv_map = {
+        "start": ["cluster", "start", "--all"],
+        "stop":  ["cluster", "stop",  "--all"],
+    }
+    if action not in argv_map:
+        return jsonify({"ok": False, "error": "Неизвестное действие"}), 400
+    return _pcs_action_run(cid, argv_map[action], f"cluster {action} --all")
 
 
 # ===== Группы (плечи) =====

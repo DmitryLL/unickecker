@@ -2024,6 +2024,16 @@
                 <div id="stunnelArea"><div class="muted">Загрузка…</div></div>
             </section>
 
+            <section data-route="pcs_clusters">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Кластеры (Pacemaker)</h1>
+                        <div class="page-sub">Просмотр статуса HA-кластера и управление ресурсами/нодами через <code>pcs</code> по SSH</div>
+                    </div>
+                </div>
+                <div id="pcsClustersArea"><div class="muted">Загрузка…</div></div>
+            </section>
+
             <!-- DB CONNECTION -->
             <!-- MICROSERVICES CATALOG (admin) -->
             <section data-route="ms_catalog">
@@ -2114,6 +2124,7 @@
                     </div>
                 </div>
                 <div id="balancerCredsArea"><div class="muted">Загрузка…</div></div>
+                <div id="pcsCredsArea" style="margin-top:24px"><div class="muted">Загрузка кластеров…</div></div>
             </section>
 
             <section data-route="db_connection">
@@ -2528,8 +2539,9 @@
             if (route === 'ms_catalog') loadMsCatalog();
             if (route === 'nodes_catalog') loadNodesCatalog();
             if (route === 'api_settings') loadApiSettings();
-            if (route === 'balancer_creds') loadBalancerCreds();
+            if (route === 'balancer_creds') { loadBalancerCreds(); loadPcsCreds(); }
             if (route === 'stunnel') { loadStunnel(); startStunnelPolling(); } else stopStunnelPolling();
+            if (route === 'pcs_clusters') { loadPcsClustersPage(); startPcsPolling(); } else stopPcsPolling();
             if (route === 'about') loadAbout(); else cancelAboutEdit({ silent: true });
             if (route === 'services') initMicroservices();
             else {
@@ -5553,6 +5565,413 @@
         }
         function stopStunnelPolling() {
             if (_stunnelTimer) { clearInterval(_stunnelTimer); _stunnelTimer = null; }
+        }
+
+        // ============ PCS / Pacemaker clusters ============
+        let _pcsState = { selectedId: null, items: [], snap: null, timer: null };
+
+        async function loadPcsCreds() {
+            const root = document.getElementById('pcsCredsArea');
+            if (!root) return;
+            root.innerHTML = `<div class="muted">Загрузка кластеров…</div>`;
+            try {
+                const resp = await fetch('/api/pcs/clusters');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                _pcsState.items = data.items || [];
+                root.innerHTML = _renderPcsCredsList(_pcsState.items);
+            } catch (e) {
+                root.innerHTML = `<div class="muted" style="color:#fca5a5">Ошибка загрузки кластеров: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+        window.loadPcsCreds = loadPcsCreds;
+
+        function _renderPcsCredsList(items) {
+            const cards = (items || []).map(c => `
+                <div class="cred-card">
+                    <div class="cred-card-title">${escapeHtml(c.name)}</div>
+                    <div class="cred-card-sub">SSH ${escapeHtml(c.ssh_login || '?')}@${escapeHtml(c.host || '?')}:${c.ssh_port || 22}
+                        · ${c.ssh_password_set ? 'пароль ✓' : '<span style="color:#fca5a5">пароль не задан</span>'}
+                        · ${c.ssh_sudo_pwd_set ? 'sudo ✓' : '<span style="color:#fca5a5">sudo не задан</span>'}
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+                        <button type="button" class="btn btn-ghost" onclick="openPcsClusterEditor(${c.id})">Редактировать</button>
+                        <button type="button" class="btn btn-ghost" onclick="testPcsClusterById(${c.id}, this)">Тест</button>
+                        <button type="button" class="btn btn-danger" onclick="deletePcsClusterById(${c.id}, '${escapeHtml(c.name)}')">Удалить</button>
+                        <span class="cred-test-out muted" id="pcsTestOut${c.id}" style="margin-left:8px"></span>
+                    </div>
+                </div>
+            `).join('');
+            const empty = items.length ? '' : `<div class="muted" style="margin-bottom:10px">Кластеры не настроены.</div>`;
+            return `
+                <div class="cred-section-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
+                    <div>Кластеры Pacemaker (SSH)</div>
+                    <button type="button" class="btn btn-primary" onclick="openPcsClusterEditor(null)">+ Добавить кластер</button>
+                </div>
+                ${empty}
+                ${cards}
+            `;
+        }
+
+        function openPcsClusterEditor(id) {
+            const item = id ? (_pcsState.items.find(x => x.id === id) || null) : null;
+            const isEdit = !!item;
+            const modalHtml = `
+                <div class="modal-backdrop show" id="pcsClusterBackdrop" onclick="if(event.target===this) closePcsClusterEditor()">
+                    <div class="modal" style="max-width:560px">
+                        <div class="modal-title">${isEdit ? 'Редактировать кластер' : 'Новый кластер'}</div>
+                        <div class="modal-sub">SSH к одной из нод кластера. Пароль и sudo-пароль шифруются.</div>
+                        <form id="pcsClusterForm" onsubmit="return savePcsClusterFromForm(event, ${isEdit ? item.id : 'null'})">
+                            <div class="field">
+                                <label>Имя (метка)</label>
+                                <input type="text" id="pcsClName" required maxlength="64" value="${escapeHtml(item ? item.name : '')}" autocomplete="off">
+                            </div>
+                            <div class="field">
+                                <label>Хост (IP или DNS одной из нод)</label>
+                                <input type="text" id="pcsClHost" required value="${escapeHtml(item ? item.host : '')}" autocomplete="off">
+                            </div>
+                            <div class="field" style="display:flex;gap:10px">
+                                <div style="flex:2">
+                                    <label>SSH-логин</label>
+                                    <input type="text" id="pcsClLogin" required value="${escapeHtml(item ? item.ssh_login : '')}" autocomplete="off">
+                                </div>
+                                <div style="flex:1">
+                                    <label>SSH-порт</label>
+                                    <input type="number" id="pcsClPort" min="1" max="65535" value="${item ? item.ssh_port : 22}">
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label>SSH-пароль ${isEdit ? '<span class="muted">(оставьте пустым, чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="pcsClPwd" autocomplete="new-password">
+                            </div>
+                            <div class="field">
+                                <label>Sudo-пароль ${isEdit ? '<span class="muted">(оставьте пустым, чтобы не менять)</span>' : '<span class="muted">— обычно тот же, что и SSH</span>'}</label>
+                                <input type="password" id="pcsClSudo" autocomplete="new-password">
+                            </div>
+                            <div class="modal-error" id="pcsClError" style="display:none;color:#fca5a5;margin:8px 0"></div>
+                            <div class="modal-actions" style="justify-content:space-between">
+                                ${isEdit ? `<button type="button" class="btn btn-danger" onclick="deletePcsClusterById(${item.id}, '${escapeHtml(item.name)}', true)">Удалить</button>` : '<span></span>'}
+                                <div style="display:flex;gap:8px">
+                                    <button type="button" class="btn btn-ghost" onclick="closePcsClusterEditor()">Отмена</button>
+                                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = modalHtml;
+            document.body.appendChild(wrapper.firstElementChild);
+        }
+        window.openPcsClusterEditor = openPcsClusterEditor;
+
+        function closePcsClusterEditor() {
+            const m = document.getElementById('pcsClusterBackdrop');
+            if (m) m.remove();
+        }
+        window.closePcsClusterEditor = closePcsClusterEditor;
+
+        async function savePcsClusterFromForm(ev, id) {
+            ev.preventDefault();
+            const errBox = document.getElementById('pcsClError');
+            errBox.style.display = 'none';
+            const body = {
+                name:       document.getElementById('pcsClName').value.trim(),
+                host:       document.getElementById('pcsClHost').value.trim(),
+                ssh_login:  document.getElementById('pcsClLogin').value.trim(),
+                ssh_port:   parseInt(document.getElementById('pcsClPort').value || '22', 10),
+                ssh_password: document.getElementById('pcsClPwd').value,
+                ssh_sudo_pwd: document.getElementById('pcsClSudo').value,
+            };
+            const url    = id ? `/api/pcs/clusters/${id}` : '/api/pcs/clusters';
+            const method = id ? 'PATCH' : 'POST';
+            try {
+                const resp = await fetch(url, {
+                    method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body),
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || data.error) {
+                    errBox.textContent = data.error || `Ошибка ${resp.status}`;
+                    errBox.style.display = 'block';
+                    return false;
+                }
+                closePcsClusterEditor();
+                toast(id ? 'Кластер обновлён' : 'Кластер добавлен', 'ok');
+                await loadPcsCreds();
+            } catch (e) {
+                errBox.textContent = `Сеть: ${e.message}`;
+                errBox.style.display = 'block';
+            }
+            return false;
+        }
+        window.savePcsClusterFromForm = savePcsClusterFromForm;
+
+        async function deletePcsClusterById(id, name, fromEditor) {
+            const ok = await confirmModal({
+                title: `Удалить кластер «${name}»?`,
+                message: 'Запись с учёткой будет удалена. Сам кластер на серверах не пострадает.',
+                kind: 'danger', confirmText: 'Удалить', confirmClass: 'btn-danger', compact: true,
+            });
+            if (!ok) return;
+            try {
+                const resp = await fetch(`/api/pcs/clusters/${id}`, {method: 'DELETE'});
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || data.error) { toast(data.error || `Ошибка ${resp.status}`, 'err'); return; }
+                if (fromEditor) closePcsClusterEditor();
+                toast('Кластер удалён', 'ok');
+                await loadPcsCreds();
+                if (_pcsState.selectedId === id) _pcsState.selectedId = null;
+            } catch (e) { toast(`Сеть: ${e.message}`, 'err'); }
+        }
+        window.deletePcsClusterById = deletePcsClusterById;
+
+        async function testPcsClusterById(id, btn) {
+            const out = document.getElementById(`pcsTestOut${id}`);
+            if (out) { out.textContent = 'Проверка…'; out.style.color = ''; }
+            if (btn) btn.disabled = true;
+            try {
+                const resp = await fetch(`/api/pcs/clusters/${id}/test`, {method: 'POST'});
+                const data = await resp.json().catch(() => ({}));
+                if (out) {
+                    if (data.ok) {
+                        out.textContent = '✓ ' + (data.version || 'OK');
+                        out.style.color = '#86efac';
+                    } else {
+                        out.textContent = '✗ ' + (data.error || `HTTP ${resp.status}`);
+                        out.style.color = '#fca5a5';
+                    }
+                }
+            } catch (e) {
+                if (out) { out.textContent = '✗ Сеть: ' + e.message; out.style.color = '#fca5a5'; }
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+        window.testPcsClusterById = testPcsClusterById;
+
+        // -------- Page «Кластеры» (status + actions) --------
+        async function loadPcsClustersPage() {
+            const root = document.getElementById('pcsClustersArea');
+            if (!root) return;
+            try {
+                const resp = await fetch('/api/pcs/clusters');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                _pcsState.items = data.items || [];
+            } catch (e) {
+                root.innerHTML = `<div class="muted" style="color:#fca5a5">Ошибка загрузки списка: ${escapeHtml(e.message)}</div>`;
+                return;
+            }
+            if (!_pcsState.items.length) {
+                root.innerHTML = `
+                    <div class="muted">Кластеры не настроены. Добавьте подключение в разделе «Учётки».</div>
+                `;
+                return;
+            }
+            // Если ранее выбран кластер, но он удалён — сбросим выбор
+            if (!_pcsState.items.some(x => x.id === _pcsState.selectedId)) {
+                _pcsState.selectedId = _pcsState.items[0].id;
+            }
+            const sel = _pcsState.selectedId;
+            const tabs = _pcsState.items.map(c => `
+                <button type="button" class="svc-tool-btn ${c.id === sel ? 'active' : ''}" style="${c.id === sel ? 'border-color:#3b82f6;color:#bfdbfe' : ''}" onclick="selectPcsCluster(${c.id})">${escapeHtml(c.name)}</button>
+            `).join('');
+            root.innerHTML = `
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+                    ${tabs}
+                    <button type="button" class="svc-tool-btn" onclick="loadPcsStatus(_pcsState.selectedId)" style="margin-left:auto">⟳ Обновить</button>
+                </div>
+                <div id="pcsStatusBody"><div class="muted">Загрузка статуса…</div></div>
+            `;
+            await loadPcsStatus(sel);
+        }
+        window.loadPcsClustersPage = loadPcsClustersPage;
+
+        function selectPcsCluster(cid) {
+            _pcsState.selectedId = cid;
+            loadPcsClustersPage();
+        }
+        window.selectPcsCluster = selectPcsCluster;
+
+        async function loadPcsStatus(cid) {
+            if (!cid) return;
+            const body = document.getElementById('pcsStatusBody');
+            if (!body) return;
+            try {
+                const resp = await fetch(`/api/pcs/clusters/${cid}/status`);
+                const data = await resp.json().catch(() => ({}));
+                _pcsState.snap = data;
+                body.innerHTML = _renderPcsSnapshot(cid, data);
+            } catch (e) {
+                body.innerHTML = `<div class="muted" style="color:#fca5a5">Сеть: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+        window.loadPcsStatus = loadPcsStatus;
+
+        function _renderPcsSnapshot(cid, snap) {
+            if (!snap || !snap.ok) {
+                return `<div class="muted" style="color:#fca5a5;white-space:pre-wrap">Не удалось получить статус: ${escapeHtml((snap && snap.error) || 'неизвестная ошибка')}</div>`;
+            }
+            const s = snap.summary || {};
+            const summary = `
+                <div class="stunnel-card" style="margin-bottom:14px">
+                    <div class="stunnel-card-title">${escapeHtml(snap.name || '')}
+                        <span class="muted" style="font-weight:400;margin-left:8px">${escapeHtml(snap.host || '')}</span>
+                    </div>
+                    <div class="muted" style="display:flex;gap:18px;flex-wrap:wrap">
+                        <span>DC: <b>${escapeHtml(s.dc || '—')}</b></span>
+                        <span>Кворум: <b style="color:${s.with_quorum ? '#86efac' : '#fca5a5'}">${s.with_quorum ? 'есть' : 'нет'}</b></span>
+                        <span>Стек: <b>${escapeHtml(s.stack || '—')}</b></span>
+                        <span>Нод: <b>${s.nodes_configured ?? '—'}</b></span>
+                        <span>Ресурсов: <b>${s.resources_configured ?? '—'}</b></span>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+                        <button type="button" class="ms-action-btn start" onclick="pcsClusterAct(${cid}, 'start', this)">Запустить кластер (--all)</button>
+                        <button type="button" class="ms-action-btn stop"  onclick="pcsClusterAct(${cid}, 'stop',  this)">Остановить кластер (--all)</button>
+                    </div>
+                </div>
+            `;
+            const nodesRows = (snap.nodes || []).map(n => {
+                const state = n.online ? (n.standby ? 'standby' : 'online') : 'offline';
+                const stateColor = state === 'online' ? '#86efac' : (state === 'standby' ? '#fbbf24' : '#fca5a5');
+                return `
+                    <tr>
+                        <td>${escapeHtml(n.name)}</td>
+                        <td><span style="color:${stateColor}">${state}</span></td>
+                        <td>${n.maintenance ? 'maint' : '—'}</td>
+                        <td>${n.resources_running}</td>
+                        <td style="white-space:nowrap">
+                            ${n.online
+                                ? (!n.standby
+                                    ? `<button type="button" class="ms-action-btn stop"  onclick="pcsNodeAct(${cid}, '${escapeHtml(n.name)}', 'standby', this)">Standby</button>`
+                                    : `<button type="button" class="ms-action-btn start" onclick="pcsNodeAct(${cid}, '${escapeHtml(n.name)}', 'unstandby', this)">Unstandby</button>`)
+                                : ''}
+                            ${n.online
+                                ? `<button type="button" class="ms-action-btn stop"  onclick="pcsNodeAct(${cid}, '${escapeHtml(n.name)}', 'cluster-stop',  this)">Stop кластер</button>`
+                                : `<button type="button" class="ms-action-btn start" onclick="pcsNodeAct(${cid}, '${escapeHtml(n.name)}', 'cluster-start', this)">Start кластер</button>`}
+                        </td>
+                    </tr>`;
+            }).join('');
+            const nodesTable = `
+                <h3 style="margin:18px 0 8px">Ноды</h3>
+                <table class="ms-table" style="width:100%">
+                    <thead><tr><th>Нода</th><th>Состояние</th><th>Maint</th><th>Ресурсов</th><th>Действия</th></tr></thead>
+                    <tbody>${nodesRows || '<tr><td colspan="5" class="muted">— нет данных —</td></tr>'}</tbody>
+                </table>
+            `;
+            const resRows = (snap.resources || []).map(r => {
+                const where = (r.nodes || []).join(', ') || '—';
+                const role = (r.role || '').toLowerCase();
+                const roleColor = (r.failed ? '#fca5a5' : (role === 'started' || role === 'master' ? '#86efac' : (role === 'stopped' ? '#94a3b8' : '#fbbf24')));
+                return `
+                    <tr>
+                        <td>${escapeHtml(r.id)}</td>
+                        <td class="muted">${escapeHtml(r.parent || '')}</td>
+                        <td>${escapeHtml(r.agent)}</td>
+                        <td><span style="color:${roleColor}">${escapeHtml(r.role)}</span>${r.managed ? '' : ' <span class="muted">(unmanaged)</span>'}</td>
+                        <td>${escapeHtml(where)}</td>
+                        <td style="white-space:nowrap">
+                            <button type="button" class="ms-action-btn restart" onclick="pcsResourceAct(${cid}, '${escapeHtml(r.id)}', 'restart', this)">Restart</button>
+                            <button type="button" class="ms-action-btn start"   onclick="pcsResourceAct(${cid}, '${escapeHtml(r.id)}', 'enable', this)">Enable</button>
+                            <button type="button" class="ms-action-btn stop"    onclick="pcsResourceAct(${cid}, '${escapeHtml(r.id)}', 'disable', this)">Disable</button>
+                            <button type="button" class="svc-tool-btn"          onclick="pcsResourceAct(${cid}, '${escapeHtml(r.id)}', 'cleanup', this)">Cleanup</button>
+                        </td>
+                    </tr>`;
+            }).join('');
+            const resTable = `
+                <h3 style="margin:18px 0 8px">Ресурсы</h3>
+                <table class="ms-table" style="width:100%">
+                    <thead><tr><th>ID</th><th>Группа/Clone</th><th>Agent</th><th>Состояние</th><th>На нодах</th><th>Действия</th></tr></thead>
+                    <tbody>${resRows || '<tr><td colspan="6" class="muted">— нет ресурсов —</td></tr>'}</tbody>
+                </table>
+            `;
+            return summary + nodesTable + resTable;
+        }
+
+        async function pcsResourceAct(cid, res, action, btn) {
+            const labels = {restart:'перезагрузить', enable:'включить', disable:'выключить', cleanup:'очистить failures'};
+            const ok = await confirmModal({
+                title: `Ресурс «${res}»: ${labels[action] || action}?`,
+                message: 'Действие выполнится через pcs на ноде кластера по SSH.',
+                kind: action === 'disable' ? 'danger' : 'warn',
+                confirmText: 'Выполнить', confirmClass: action === 'disable' ? 'btn-danger' : 'btn-warn',
+                compact: true,
+            });
+            if (!ok) return;
+            await _pcsRunAction(`/api/pcs/clusters/${cid}/resource/${encodeURIComponent(res)}/${action}`, btn, cid);
+        }
+        window.pcsResourceAct = pcsResourceAct;
+
+        async function pcsNodeAct(cid, node, action, btn) {
+            const titles = {
+                'standby':       `Нода «${node}»: Standby?`,
+                'unstandby':     `Нода «${node}»: Unstandby?`,
+                'cluster-stop':  `Остановить pacemaker/corosync на ноде «${node}»?`,
+                'cluster-start': `Запустить pacemaker/corosync на ноде «${node}»?`,
+            };
+            const messages = {
+                'standby':       'Все ресурсы съедут с этой ноды на остальные. Сама нода останется в кластере.',
+                'unstandby':     'Нода вернётся в активную работу, кластер сможет на неё назначать ресурсы.',
+                'cluster-stop':  'Будут остановлены corosync/pacemaker на этой ноде. Все её ресурсы переедут на остальные ноды (если позволяет квалификация).',
+                'cluster-start': 'Будут запущены corosync/pacemaker на этой ноде, она вернётся в кластер.',
+            };
+            const isDanger = action === 'standby' || action === 'cluster-stop';
+            const ok = await confirmModal({
+                title: titles[action] || `Нода «${node}»: ${action}?`,
+                message: messages[action] || 'Действие выполнится через pcs по SSH.',
+                kind: isDanger ? 'danger' : 'warn',
+                confirmText: 'Выполнить', confirmClass: isDanger ? 'btn-danger' : 'btn-warn',
+                compact: true,
+            });
+            if (!ok) return;
+            await _pcsRunAction(`/api/pcs/clusters/${cid}/node/${encodeURIComponent(node)}/${action}`, btn, cid);
+        }
+        window.pcsNodeAct = pcsNodeAct;
+
+        async function pcsClusterAct(cid, action, btn) {
+            const isStop = action === 'stop';
+            const ok = await confirmModal({
+                title: `Кластер: ${isStop ? 'остановить' : 'запустить'} на всех нодах?`,
+                message: isStop ? 'Будут остановлены corosync/pacemaker на ВСЕХ нодах. Сервисы кластера встанут.' : 'Будут запущены corosync/pacemaker на всех нодах.',
+                kind: isStop ? 'danger' : 'warn',
+                confirmText: isStop ? 'Остановить' : 'Запустить',
+                confirmClass: isStop ? 'btn-danger' : 'btn-warn',
+                compact: true,
+            });
+            if (!ok) return;
+            await _pcsRunAction(`/api/pcs/clusters/${cid}/cluster/${action}`, btn, cid);
+        }
+        window.pcsClusterAct = pcsClusterAct;
+
+        async function _pcsRunAction(url, btn, cid) {
+            if (btn) { btn.disabled = true; btn.dataset._t = btn.textContent; btn.textContent = '…'; }
+            try {
+                const resp = await fetch(url, {method: 'POST'});
+                const data = await resp.json().catch(() => ({}));
+                if (data.ok) {
+                    toast('Готово', 'ok');
+                } else {
+                    toast(data.error || `Ошибка ${resp.status}`, 'err');
+                }
+                // Перечитать статус через короткую паузу — pcs не всегда мгновенно обновляет CIB
+                setTimeout(() => loadPcsStatus(cid), 800);
+            } catch (e) {
+                toast(`Сеть: ${e.message}`, 'err');
+            } finally {
+                if (btn) { btn.disabled = false; if (btn.dataset._t) btn.textContent = btn.dataset._t; }
+            }
+        }
+
+        function startPcsPolling() {
+            stopPcsPolling();
+            _pcsState.timer = setInterval(() => {
+                if (_pcsState.selectedId) loadPcsStatus(_pcsState.selectedId);
+            }, 5000);
+        }
+        function stopPcsPolling() {
+            if (_pcsState.timer) { clearInterval(_pcsState.timer); _pcsState.timer = null; }
         }
 
         // ============ ABOUT (documentation) ============
