@@ -3369,6 +3369,16 @@ def _pcs_parse_status_json(data):
         })
 
     summary["resources_configured"] = len(resources_out)
+
+    # pcsd не отдаёт resources_running на ноду — считаем сами по nodes у ресурсов
+    by_node = {}
+    for r in resources_out:
+        for nm in r.get("nodes") or []:
+            by_node[nm] = by_node.get(nm, 0) + 1
+    for n in nodes_out:
+        if not n.get("resources_running"):
+            n["resources_running"] = by_node.get(n["name"], 0)
+
     return {"ok": True, "summary": summary, "nodes": nodes_out, "resources": resources_out}
 
 
