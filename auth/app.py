@@ -3303,6 +3303,7 @@ def _pcs_parse_status_json(data):
             "maintenance":       bool(n.get("maintenance", False)),
             "resources_running": int(n.get("resources_running") or 0),
         })
+    nodes_out.sort(key=lambda x: x.get("name") or "")
     summary["nodes_configured"] = len(nodes_out)
 
     def _flatten(seq, parent_id):
@@ -3368,6 +3369,7 @@ def _pcs_parse_status_json(data):
             "parent":          parent,
         })
 
+    resources_out.sort(key=lambda x: x.get("id") or "")
     summary["resources_configured"] = len(resources_out)
 
     # pcsd не отдаёт resources_running на ноду — считаем сами по nodes у ресурсов
@@ -3580,22 +3582,34 @@ def _pcs_action_run(cid, path, form_data, audit_msg):
         return jsonify({"ok": False, "error": str(e)}), 200
     try:
         rc, body = _pcsd_post(sess, base, path, data=form_data, timeout=120)
-        ok = (rc == 200)
-        # pcsd иногда возвращает 200 даже при логических ошибках — короткий
-        # ответ часто содержит «success» или код ошибки. Сохраняем как есть.
         body_short = (body or "").strip()
         if len(body_short) > 400:
             body_short = body_short[:400] + "…"
+        # pcsd 0.9.x иногда возвращает 200 даже при логической ошибке —
+        # настоящая причина тогда лежит в теле. Считаем ошибкой, если HTTP
+        # не 200 ИЛИ если в теле явные маркеры ошибки.
+        body_low = body_short.lower()
+        looks_err = (
+            body_low.startswith("error")
+            or "permission denied" in body_low
+            or "not authorized" in body_low
+            or '"notauthorized"' in body_low
+            or body_low.startswith("unable")
+            or "не удалось" in body_low
+        )
+        ok = (rc == 200) and not looks_err
         ms_console_append(
             "info" if ok else "err",
-            f"PCS [{c['name']}]: {audit_msg}" + ("" if ok else f" — HTTP {rc}: {body_short[:200]}"),
+            f"PCS [{c['name']}]: {audit_msg}"
+            + (f" — HTTP {rc}, тело: {body_short[:200]}" if not ok else
+               (f" — ответ: {body_short[:120]}" if body_short else "")),
             u["username"],
         )
         return jsonify({
             "ok":     ok,
             "rc":     rc,
             "output": body_short,
-            "error":  "" if ok else f"HTTP {rc}: {body_short}",
+            "error":  "" if ok else (f"HTTP {rc}: {body_short}" if body_short else f"HTTP {rc}"),
         })
     finally:
         try: sess.close()
