@@ -3567,7 +3567,10 @@ def pcs_clusters_status(cid):
 
 def _pcs_action_run(cid, path, form_data, audit_msg):
     """Общая логика действия. path — pcsd-эндпоинт типа '/remote/manage_resource'.
-    form_data — словарь form-параметров. Возвращает Flask response."""
+    form_data — словарь form-параметров. Возвращает Flask response.
+
+    Логирует точные form-данные в ms_console чтобы было видно, что именно ушло
+    на pcsd (полезно для отладки «не та нода» и т.п.)."""
     u = current_user()
     if u is None:
         return jsonify({"ok": False, "error": "Не авторизован"}), 401
@@ -3576,6 +3579,12 @@ def _pcs_action_run(cid, path, form_data, audit_msg):
     c = pcs_cluster_decrypt(pcs_cluster_row(cid))
     if not c:
         return jsonify({"ok": False, "error": "Кластер не найден"}), 404
+    # Аудит «что именно собираемся послать»
+    ms_console_append(
+        "info",
+        f"PCS [{c['name']}]: → POST {path} form={form_data}",
+        u["username"],
+    )
     try:
         sess, base = _pcsd_login(c)
     except BalancerError as e:
@@ -3585,9 +3594,6 @@ def _pcs_action_run(cid, path, form_data, audit_msg):
         body_short = (body or "").strip()
         if len(body_short) > 400:
             body_short = body_short[:400] + "…"
-        # pcsd 0.9.x иногда возвращает 200 даже при логической ошибке —
-        # настоящая причина тогда лежит в теле. Считаем ошибкой, если HTTP
-        # не 200 ИЛИ если в теле явные маркеры ошибки.
         body_low = body_short.lower()
         looks_err = (
             body_low.startswith("error")
@@ -3600,9 +3606,8 @@ def _pcs_action_run(cid, path, form_data, audit_msg):
         ok = (rc == 200) and not looks_err
         ms_console_append(
             "info" if ok else "err",
-            f"PCS [{c['name']}]: {audit_msg}"
-            + (f" — HTTP {rc}, тело: {body_short[:200]}" if not ok else
-               (f" — ответ: {body_short[:120]}" if body_short else "")),
+            f"PCS [{c['name']}]: ← {audit_msg} HTTP {rc}"
+            + (f", тело: {body_short[:200]!r}" if body_short else " (пустое тело)"),
             u["username"],
         )
         return jsonify({
@@ -3656,7 +3661,6 @@ def pcs_resource_action(cid, res, action):
     if not _pcs_safe_name(res):
         return jsonify({"ok": False, "error": "Недопустимое имя ресурса"}), 400
     action = (action or "").lower()
-    # path, form-data
     action_map = {
         "enable":  ("/remote/manage_resource",  {"resource": res, "command": "enable"}),
         "disable": ("/remote/manage_resource",  {"resource": res, "command": "disable"}),
@@ -3666,8 +3670,8 @@ def pcs_resource_action(cid, res, action):
     }
     if action not in action_map:
         return jsonify({"ok": False, "error": "Неизвестное действие"}), 400
-    if not _pcs_known_resource(cid, res):
-        return jsonify({"ok": False, "error": f"Ресурс «{res}» не найден в кластере"}), 404
+    # _pcs_known_resource проверка убрана — фронт уже валидирует имя по
+    # последнему статусу, плюс лишний логин в pcsd создаёт race с действием.
     path, form = action_map[action]
     return _pcs_action_run(cid, path, form, f"resource {action} {res}")
 
@@ -3678,16 +3682,16 @@ def pcs_node_action(cid, node, action):
     if not _pcs_safe_name(node):
         return jsonify({"ok": False, "error": "Недопустимое имя ноды"}), 400
     action = (action or "").lower()
+    # Для standby pcsd 0.10+ принимает и node, и nodes; на всякий случай
+    # шлём оба ключа — какой подойдёт, тот и сработает. Главное — ОДНУ ноду.
     action_map = {
-        "standby":       ("/remote/node_standby",   {"node": node}),
-        "unstandby":     ("/remote/node_unstandby", {"node": node}),
+        "standby":       ("/remote/node_standby",   {"node": node, "name": node}),
+        "unstandby":     ("/remote/node_unstandby", {"node": node, "name": node}),
         "cluster-start": ("/remote/cluster_start",  {"name": node}),
         "cluster-stop":  ("/remote/cluster_stop",   {"name": node}),
     }
     if action not in action_map:
         return jsonify({"ok": False, "error": "Неизвестное действие"}), 400
-    if not _pcs_known_node(cid, node):
-        return jsonify({"ok": False, "error": f"Нода «{node}» не найдена в кластере"}), 404
     path, form = action_map[action]
     return _pcs_action_run(cid, path, form, f"node {action} {node}")
 
