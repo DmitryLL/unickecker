@@ -5965,12 +5965,16 @@
                 const resp = await fetch(url, {method: 'POST'});
                 const data = await resp.json().catch(() => ({}));
                 if (data.ok) {
-                    toast('Готово', 'ok');
+                    toast('Готово, обновляем статус…', 'ok');
                 } else {
                     toast(data.error || `Ошибка ${resp.status}`, 'err');
                 }
-                // Перечитать статус через короткую паузу — pcs не всегда мгновенно обновляет CIB
+                // pcsd обновляет CIB и распространяет изменения 1–3 секунды.
+                // Делаем три проверки: быстро, через 2.5с, через 5с — чтобы
+                // пользователь увидел свежий статус как только pcsd его применит.
                 setTimeout(() => loadPcsStatus(cid), 800);
+                setTimeout(() => loadPcsStatus(cid), 2500);
+                setTimeout(() => loadPcsStatus(cid), 5000);
             } catch (e) {
                 toast(`Сеть: ${e.message}`, 'err');
             } finally {
