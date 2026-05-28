@@ -2136,6 +2136,28 @@
                 <div id="dbConnections" class="db-list"></div>
             </section>
 
+            <!-- RSHB MAILER (main) -->
+            <section data-route="rshb_mailer">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Отчёт РСХБ</h1>
+                        <div class="page-sub">Архивируем файл в 7z с паролем и отправляем письмом по списку из настроек</div>
+                    </div>
+                </div>
+                <div id="rshbMailerArea"><div class="muted">Загрузка…</div></div>
+            </section>
+
+            <!-- RSHB MAILER SETTINGS -->
+            <section data-route="rshb_mailer_settings">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Настройка РСХБ</h1>
+                        <div class="page-sub">Почта отправителя, SMTP, пароль архива и адреса по умолчанию</div>
+                    </div>
+                </div>
+                <div id="rshbMailerSettingsArea"><div class="muted">Загрузка…</div></div>
+            </section>
+
             <section data-route="__denied">
                 <div class="page-header"><div><h1 class="page-title">Нет доступа</h1><div class="page-sub">Раздел недоступен для вашей учётной записи</div></div></div>
                 <div class="denied">403 — обратитесь к администратору для получения доступа.</div>
@@ -2328,6 +2350,18 @@
         </div>
     </div>
 
+    <div class="modal-backdrop" id="rshbResultBackdrop" onclick="if(event.target===this) rshbResultClose()">
+        <div class="modal" style="max-width: 560px">
+            <div id="rshbResultIcon" class="confirm-icon success" style="margin: 0 auto 12px"></div>
+            <div class="modal-title" id="rshbResultTitle" style="text-align:center">Отправлено</div>
+            <div class="modal-sub" id="rshbResultSub" style="text-align:center"></div>
+            <div id="rshbResultList" style="margin-top:16px;display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto"></div>
+            <div class="modal-actions" style="margin-top:18px;justify-content:flex-end">
+                <button type="button" class="btn btn-primary" onclick="rshbResultClose()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast-stack" id="toastStack"></div>
 
     <script>
@@ -2345,6 +2379,8 @@
             stunnel:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z"/><path d="M9 12l2 2 4-4"/></svg>',
             pcs_clusters:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>',
             about:         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+            rshb_mailer:          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+            rshb_mailer_settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H5.17L4 17.17V4z"/><circle cx="12" cy="10" r="2"/><path d="M12 7v-1M12 14v-1M9.5 10h-1M15.5 10h-1"/></svg>',
         };
         const GROUP_LABELS = { main: 'Основное', settings: 'Настройки' };
         const DEFAULT_ROUTE = 'operations';
@@ -2551,6 +2587,8 @@
             }
             if (route === 'Balancer') renderMicroservicesList();
             else { stopSvcPolling(); stopSvcAllHealthPoll(); stopSvcOrchPolling(); }
+            if (route === 'rshb_mailer') loadRshbMailer();
+            if (route === 'rshb_mailer_settings') loadRshbMailerSettings();
         }
 
         // ============ OPERATIONS LOOKUP ============
@@ -7325,6 +7363,450 @@
                 toast(err.message, 'err');
             }
         }
+
+        // ============ RSHB MAILER ============
+        function rshbYesterdayDDMMYYYY() {
+            const d = new Date(); d.setDate(d.getDate() - 1);
+            const pad = n => String(n).padStart(2, '0');
+            return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+        }
+
+        async function loadRshbMailer() {
+            const root = document.getElementById('rshbMailerArea');
+            if (!root) return;
+            root.innerHTML = '<div class="muted">Загрузка…</div>';
+            try {
+                const resp = await fetch('/api/rshb-mailer/defaults');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const d = await resp.json();
+                const tmpl = d.subject_template || 'Отчет по клирингу за {date} 183014';
+                const tmplIdx = tmpl.indexOf('{date}');
+                const today = rshbYesterdayDDMMYYYY();
+                const dateInput = `<input type="text" id="rshbDate" maxlength="10" autocomplete="off" spellcheck="false"
+                       value="${escapeHtml(today)}" placeholder="ДД.ММ.ГГГГ"
+                       oninput="this.value = this.value.replace(/[^0-9.]/g, '').slice(0,10)"
+                       style="font: inherit; font-weight:700; width: 120px; padding:4px 10px; border-radius:6px; border:1px solid rgba(99,102,241,0.45); background: rgba(99,102,241,0.12); color:#f3f4f6; text-align:center; outline:none">`;
+                const subjectLine = tmplIdx >= 0
+                    ? `${escapeHtml(tmpl.slice(0, tmplIdx))}${dateInput}${escapeHtml(tmpl.slice(tmplIdx + 6))}`
+                    : `${escapeHtml(tmpl)} ${dateInput}`;
+                const senderLine = d.sender_email
+                    ? `<div class="cred-card" style="padding:14px 16px">
+                           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                               <span class="cred-card-icon" style="font-size:18px;width:auto;height:auto">📤</span>
+                               <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em">Отправитель</div>
+                               <div style="flex:1;min-width:160px;font-size:15px;font-weight:600;color:#f3f4f6;padding:8px 12px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.08)">${escapeHtml(d.sender_email)}</div>
+                           </div>
+                       </div>` : '';
+                root.innerHTML = `
+                    <div style="max-width:720px">
+                        ${senderLine}
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">✉️</span>
+                                <div>
+                                    <div class="cred-card-title">Тема письма</div>
+                                    <div class="cred-card-sub">По умолчанию — вчерашняя дата, можно изменить</div>
+                                </div>
+                            </div>
+                            <div id="rshbSubjectBox" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:16px;font-weight:600;color:#f3f4f6;padding:14px 16px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.08);line-height:1.6">${subjectLine}</div>
+                        </div>
+
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">📨</span>
+                                <div>
+                                    <div class="cred-card-title">Получатели</div>
+                                    <div class="cred-card-sub">Каждый адрес на отдельной строке. По умолчанию — из настроек</div>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label for="rshbRecipients">Кому</label>
+                                <textarea id="rshbRecipients" rows="4" spellcheck="false" autocomplete="off"
+                                          style="width:100%;font-family:inherit;font-size:13px;padding:10px 12px;border-radius:9px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#f3f4f6;resize:vertical;outline:none">${escapeHtml((d.default_recipients || []).join('\n'))}</textarea>
+                            </div>
+                            <div class="field" style="margin-bottom:0">
+                                <label for="rshbBcc">Скрытая копия (BCC)</label>
+                                <textarea id="rshbBcc" rows="2" spellcheck="false" autocomplete="off"
+                                          style="width:100%;font-family:inherit;font-size:13px;padding:10px 12px;border-radius:9px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#f3f4f6;resize:vertical;outline:none">${escapeHtml((d.default_bcc || []).join('\n'))}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">📎</span>
+                                <div>
+                                    <div class="cred-card-title">Файл отчёта</div>
+                                    <div class="cred-card-sub">Будет упакован в 7z с паролем и приложен к письму. До 50 MB</div>
+                                </div>
+                            </div>
+                            <div class="field" style="margin-bottom:0">
+                                <input type="file" id="rshbFile" onchange="rshbOnFile(this)" style="display:none">
+                                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                                    <button type="button" class="btn btn-primary" onclick="document.getElementById('rshbFile').click()" style="min-width:170px;justify-content:center">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                        Выбрать файл
+                                    </button>
+                                    <div id="rshbFilePill" style="display:none;align-items:center;gap:8px;padding:8px 12px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);border-radius:9px;font-size:13px;color:#f3f4f6;max-width:100%">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;color:#a5b4fc"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                        <span id="rshbFileName" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px"></span>
+                                        <span id="rshbFileSize" class="muted" style="font-size:11px"></span>
+                                        <button type="button" onclick="rshbClearFile()" title="Убрать файл" style="background:none;border:none;color:#9ca3af;cursor:pointer;padding:0 4px;font-size:16px;line-height:1">×</button>
+                                    </div>
+                                    <span id="rshbFileHint" class="muted" style="font-size:12px">Файл не выбран</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-primary" id="rshbSendBtn"
+                                style="width:100%;justify-content:center;margin-top:14px;padding:14px;font-size:15px;font-weight:600" onclick="rshbSend(this)">Отправить</button>
+                        <div id="rshbStatus" class="muted" style="font-size:12px;margin-top:8px;text-align:center"></div>
+                        <div class="modal-error" id="rshbError"></div>
+                    </div>`;
+            } catch (e) {
+                root.innerHTML = `<div class="muted" style="color:#fca5a5">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+        window.loadRshbMailer = loadRshbMailer;
+
+        function rshbOnFile(input) {
+            const hint = document.getElementById('rshbFileHint');
+            const pill = document.getElementById('rshbFilePill');
+            const nameEl = document.getElementById('rshbFileName');
+            const sizeEl = document.getElementById('rshbFileSize');
+            const f = input.files && input.files[0];
+            if (!f) {
+                pill.style.display = 'none';
+                hint.style.display = '';
+                hint.textContent = 'Файл не выбран';
+                hint.style.color = '';
+                return;
+            }
+            const mb = (f.size / (1024 * 1024)).toFixed(2);
+            nameEl.textContent = f.name;
+            sizeEl.textContent = `${mb} MB`;
+            pill.style.display = 'inline-flex';
+            if (f.size > 50 * 1024 * 1024) {
+                hint.style.display = '';
+                hint.style.color = '#fca5a5';
+                hint.textContent = 'Слишком большой, лимит 50 MB';
+            } else {
+                hint.style.display = 'none';
+            }
+        }
+        window.rshbOnFile = rshbOnFile;
+
+        function rshbClearFile() {
+            const inp = document.getElementById('rshbFile');
+            if (inp) inp.value = '';
+            rshbOnFile({ files: [] });
+        }
+        window.rshbClearFile = rshbClearFile;
+
+        async function rshbSend(btn) {
+            const errBox = document.getElementById('rshbError');
+            const status = document.getElementById('rshbStatus');
+            errBox.classList.remove('show');
+            errBox.textContent = '';
+            status.textContent = '';
+
+            const fileInput = document.getElementById('rshbFile');
+            const f = fileInput.files && fileInput.files[0];
+            if (!f) { errBox.textContent = 'Выберите файл для отправки.'; errBox.classList.add('show'); return; }
+            if (f.size > 50 * 1024 * 1024) {
+                errBox.textContent = 'Файл больше 50 MB.'; errBox.classList.add('show'); return;
+            }
+
+            const date = document.getElementById('rshbDate').value.trim();
+            if (!date) { errBox.textContent = 'Укажите дату.'; errBox.classList.add('show'); return; }
+
+            const recipientsRaw = document.getElementById('rshbRecipients').value;
+            const bccRaw = document.getElementById('rshbBcc').value;
+            const splitList = s => s.split(/[\s,;]+/).map(x => x.trim()).filter(Boolean);
+            const recipientsList = splitList(recipientsRaw);
+            const bccList = splitList(bccRaw);
+
+            if (!recipientsList.length) {
+                errBox.textContent = 'Укажите хотя бы одного получателя.';
+                errBox.classList.add('show');
+                return;
+            }
+
+            // Собираем тему из шаблона + текущей даты в инпуте (textContent не работает — input value не в innerText)
+            const dateVal = document.getElementById('rshbDate').value.trim();
+            const subjectBox = document.getElementById('rshbSubjectBox');
+            const subjectText = subjectBox
+                ? Array.from(subjectBox.childNodes).map(n =>
+                    n.nodeType === Node.TEXT_NODE ? n.textContent
+                  : (n.tagName === 'INPUT' ? n.value : n.textContent || '')
+                  ).join('').replace(/\s+/g, ' ').trim()
+                : `Отчет по клирингу за ${dateVal} 183014`;
+            const mb = (f.size / (1024 * 1024)).toFixed(2);
+
+            const groups = [
+                { title: 'Кому', items: recipientsList },
+            ];
+            if (bccList.length) groups.push({ title: 'Скрытая копия', items: bccList });
+
+            const ok = await confirmModal({
+                title: 'Отправить отчёт?',
+                message: subjectText ? `Тема: ${subjectText}` : '',
+                flags: [
+                    { label: `📎 ${f.name}` },
+                    { label: `${mb} MB`, muted: true },
+                ],
+                groups,
+                kind: 'success',
+                confirmText: 'Отправить',
+                confirmClass: 'btn-primary',
+            });
+            if (!ok) return;
+
+            const fd = new FormData();
+            fd.append('file', f, f.name);
+            fd.append('date', date);
+            fd.append('recipients', recipientsRaw);
+            fd.append('bcc', bccRaw);
+
+            btn.disabled = true;
+            const origText = btn.textContent;
+            btn.textContent = 'Отправка…';
+            status.textContent = 'Архивируем и отправляем…';
+            try {
+                const resp = await fetch('/api/rshb-mailer/send', { method: 'POST', body: fd });
+                const j = await resp.json().catch(() => ({}));
+                if (!resp.ok) throw new Error(j.error || `HTTP ${resp.status}`);
+                status.textContent = '';
+                rshbShowResult(j);
+                if (j.ok_count > 0) rshbClearFile();
+            } catch (e) {
+                errBox.textContent = e.message;
+                errBox.classList.add('show');
+                status.textContent = '';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = origText;
+            }
+        }
+        window.rshbSend = rshbSend;
+
+        function rshbShowResult(j) {
+            const all = (j.recipients || []).concat(j.bcc || []);
+            const okCount = j.ok_count || 0;
+            const failCount = j.fail_count || 0;
+            const totalCount = okCount + failCount;
+            const allOk = failCount === 0 && okCount > 0;
+
+            const iconEl = document.getElementById('rshbResultIcon');
+            const titleEl = document.getElementById('rshbResultTitle');
+            const subEl = document.getElementById('rshbResultSub');
+
+            iconEl.className = 'confirm-icon ' + (allOk ? 'success' : (okCount > 0 ? 'warn' : 'danger'));
+            iconEl.innerHTML = CONFIRM_ICONS[allOk ? 'success' : 'warn'] || '';
+
+            if (allOk) {
+                titleEl.textContent = 'Отправлено';
+                subEl.textContent = `Письмо принято сервером для всех ${okCount} адрес(ов).`;
+            } else if (okCount > 0) {
+                titleEl.textContent = 'Отправлено частично';
+                subEl.textContent = `Принято: ${okCount} из ${totalCount}. Отклонено: ${failCount}.`;
+            } else {
+                titleEl.textContent = 'Не отправлено';
+                subEl.textContent = `Все ${totalCount} адрес(ов) отклонены сервером.`;
+            }
+
+            const list = document.getElementById('rshbResultList');
+            list.innerHTML = all.map(r => {
+                const typeBadge = r.type === 'bcc' ? 'BCC' : 'Кому';
+                const typeColor = r.type === 'bcc'
+                    ? 'background:rgba(156,163,175,0.15);color:#9ca3af'
+                    : 'background:rgba(99,102,241,0.15);color:#a5b4fc';
+                const statusColor = r.ok
+                    ? 'background:rgba(16,185,129,0.15);color:#6ee7b7;border-color:rgba(16,185,129,0.35)'
+                    : 'background:rgba(239,68,68,0.12);color:#fca5a5;border-color:rgba(239,68,68,0.35)';
+                const statusText = r.ok ? 'отправлено' : 'не отправлено';
+                const codeStr = r.code ? ` <span class="muted" style="font-size:11px">(${r.code})</span>` : '';
+                const errLine = r.ok ? '' : `
+                    <div class="muted" style="font-size:11px;margin-top:4px;color:#fca5a5">${escapeHtml(r.error || 'Отклонено')}${codeStr}</div>`;
+                return `
+                <div style="display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid rgba(255,255,255,0.08);border-radius:9px;background:rgba(255,255,255,0.02)">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <span style="font-size:10px;font-weight:600;text-transform:uppercase;padding:2px 7px;border-radius:5px;${typeColor}">${typeBadge}</span>
+                        <span style="font-size:13px;font-weight:500;color:#f3f4f6;word-break:break-all">${escapeHtml(r.email)}</span>
+                        <span style="margin-left:auto;font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;border:1px solid;${statusColor}">${statusText}</span>
+                    </div>
+                    ${errLine}
+                </div>`;
+            }).join('');
+
+            document.getElementById('rshbResultBackdrop').classList.add('open');
+        }
+        window.rshbShowResult = rshbShowResult;
+
+        function rshbResultClose() {
+            document.getElementById('rshbResultBackdrop').classList.remove('open');
+        }
+        window.rshbResultClose = rshbResultClose;
+
+        async function loadRshbMailerSettings() {
+            const root = document.getElementById('rshbMailerSettingsArea');
+            if (!root) return;
+            root.innerHTML = '<div class="muted">Загрузка…</div>';
+            try {
+                const resp = await fetch('/api/rshb-mailer/settings');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const s = await resp.json();
+                root.innerHTML = `
+                    <div style="max-width:640px">
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">✉️</span>
+                                <div>
+                                    <div class="cred-card-title">Почта отправителя</div>
+                                    <div class="cred-card-sub">Используется для SMTP-логина и поля From</div>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label for="rsEmail">Email отправителя</label>
+                                <input type="text" id="rsEmail" autocomplete="off" spellcheck="false"
+                                       value="${escapeHtml(s.sender_email || '')}">
+                            </div>
+                            <div class="field" style="margin-bottom:0">
+                                <label for="rsPassword">Пароль почты ${s.sender_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="rsPassword" autocomplete="new-password"
+                                       placeholder="${s.sender_password_set ? '••••••••' : 'введите пароль'}">
+                                <div class="field-hint">Для mail.ru — пароль для внешних приложений</div>
+                            </div>
+                        </div>
+
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">🌐</span>
+                                <div>
+                                    <div class="cred-card-title">SMTP-сервер</div>
+                                    <div class="cred-card-sub">Порт 465 — SSL, остальные — STARTTLS</div>
+                                </div>
+                            </div>
+                            <div class="field" style="display:grid;grid-template-columns:1fr 110px;gap:10px;margin-bottom:0">
+                                <div>
+                                    <label for="rsSmtpHost">Хост</label>
+                                    <input type="text" id="rsSmtpHost" autocomplete="off" spellcheck="false"
+                                           value="${escapeHtml(s.smtp_host || '')}" placeholder="smtp.mail.ru">
+                                </div>
+                                <div>
+                                    <label for="rsSmtpPort">Порт</label>
+                                    <input type="text" id="rsSmtpPort" inputmode="numeric" maxlength="5"
+                                           value="${s.smtp_port || 465}"
+                                           oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 5)">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">🔒</span>
+                                <div>
+                                    <div class="cred-card-title">Архив</div>
+                                    <div class="cred-card-sub">Пароль для 7z-архива с отчётом</div>
+                                </div>
+                            </div>
+                            <div class="field" style="margin-bottom:0">
+                                <label for="rsArchPwd">Пароль архива ${s.archive_password_set ? '<span class="muted" style="font-size:10px">(сохранён, оставьте пустым чтобы не менять)</span>' : ''}</label>
+                                <input type="password" id="rsArchPwd" autocomplete="new-password"
+                                       placeholder="${s.archive_password_set ? '••••••••' : 'введите пароль архива'}">
+                            </div>
+                        </div>
+
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">📑</span>
+                                <div>
+                                    <div class="cred-card-title">Тема письма</div>
+                                    <div class="cred-card-sub">Плейсхолдер <code>{date}</code> заменяется на введённую на «Отправке» дату</div>
+                                </div>
+                            </div>
+                            <div class="field" style="margin-bottom:0">
+                                <label for="rsSubject">Шаблон темы</label>
+                                <input type="text" id="rsSubject" autocomplete="off" spellcheck="false"
+                                       value="${escapeHtml(s.subject_template || '')}"
+                                       placeholder="Отчет по клирингу за {date} 183014">
+                            </div>
+                        </div>
+
+                        <div class="cred-card">
+                            <div class="cred-card-head">
+                                <span class="cred-card-icon">📨</span>
+                                <div>
+                                    <div class="cred-card-title">Адреса по умолчанию</div>
+                                    <div class="cred-card-sub">Подставляются в форму отправки. По одному на строку</div>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label for="rsRecipients">Получатели</label>
+                                <textarea id="rsRecipients" rows="4" spellcheck="false" autocomplete="off"
+                                          style="width:100%;font-family:inherit;font-size:13px;padding:10px 12px;border-radius:9px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#f3f4f6;resize:vertical;outline:none">${escapeHtml((s.default_recipients || []).join('\n'))}</textarea>
+                            </div>
+                            <div class="field" style="margin-bottom:0">
+                                <label for="rsBcc">Скрытая копия (BCC)</label>
+                                <textarea id="rsBcc" rows="2" spellcheck="false" autocomplete="off"
+                                          style="width:100%;font-family:inherit;font-size:13px;padding:10px 12px;border-radius:9px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#f3f4f6;resize:vertical;outline:none">${escapeHtml((s.default_bcc || []).join('\n'))}</textarea>
+                            </div>
+                        </div>
+
+                        <div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">
+                            <button type="button" class="btn btn-primary" id="rsSaveBtn"
+                                    style="min-width:160px;justify-content:center" onclick="saveRshbMailerSettings(this)">Сохранить</button>
+                            <span class="muted" id="rsStatus" style="font-size:12px"></span>
+                        </div>
+                        <div class="modal-error" id="rsError"></div>
+                    </div>`;
+            } catch (e) {
+                root.innerHTML = `<div class="muted" style="color:#fca5a5">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+        window.loadRshbMailerSettings = loadRshbMailerSettings;
+
+        async function saveRshbMailerSettings(btn) {
+            const err = document.getElementById('rsError');
+            const status = document.getElementById('rsStatus');
+            err.classList.remove('show');
+            err.textContent = '';
+            status.textContent = '';
+
+            const body = {
+                sender_email:       document.getElementById('rsEmail').value.trim(),
+                smtp_host:          document.getElementById('rsSmtpHost').value.trim(),
+                smtp_port:          parseInt(document.getElementById('rsSmtpPort').value, 10) || 465,
+                subject_template:   document.getElementById('rsSubject').value,
+                default_recipients: document.getElementById('rsRecipients').value,
+                default_bcc:        document.getElementById('rsBcc').value,
+            };
+            const pwd = document.getElementById('rsPassword').value;
+            if (pwd) body.sender_password = pwd;
+            const apwd = document.getElementById('rsArchPwd').value;
+            if (apwd) body.archive_password = apwd;
+
+            btn.disabled = true;
+            const origText = btn.textContent;
+            btn.textContent = 'Сохранение…';
+            try {
+                const resp = await fetch('/api/rshb-mailer/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const j = await resp.json().catch(() => ({}));
+                if (!resp.ok) throw new Error(j.error || `HTTP ${resp.status}`);
+                toast('Настройки сохранены', 'ok');
+                await loadRshbMailerSettings();
+            } catch (e) {
+                err.textContent = e.message;
+                err.classList.add('show');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = origText;
+            }
+        }
+        window.saveRshbMailerSettings = saveRshbMailerSettings;
 
         // ============ UTILS ============
         function escapeHtml(s) {

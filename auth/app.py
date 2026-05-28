@@ -33,11 +33,22 @@ except Exception:
     paramiko = None
 
 import shlex
+import smtplib
+import tempfile
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from cryptography.fernet import Fernet, InvalidToken
+
+try:
+    import py7zr
+except Exception:
+    py7zr = None
 
 app = Flask(__name__)
 
@@ -67,6 +78,8 @@ ROUTES = [
     {"key": "nodes_catalog",    "title": "Каталог нод для микросервисов", "group": "settings"},
     {"key": "api_settings",     "title": "Настройка API",         "group": "settings"},
     {"key": "balancer_creds",   "title": "Учётки",                 "group": "settings"},
+    {"key": "rshb_mailer",         "title": "Отчёт РСХБ",  "group": "main"},
+    {"key": "rshb_mailer_settings","title": "Настройка РСХБ",  "group": "settings"},
     {"key": "about",            "title": "О программе",          "group": "settings"},
 ]
 ROUTE_KEYS = {r["key"] for r in ROUTES}
@@ -369,6 +382,38 @@ def init_db():
     conn.execute(
         "INSERT OR IGNORE INTO balancer_credentials (id, updated_at) VALUES (1, ?)",
         (_now,),
+    )
+
+    # Настройки отправки отчёта по клирингу РСХБ (single row)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS rshb_mailer_settings (
+            id                 INTEGER PRIMARY KEY CHECK (id = 1),
+            sender_email       TEXT NOT NULL DEFAULT '',
+            sender_password    TEXT NOT NULL DEFAULT '',
+            smtp_host          TEXT NOT NULL DEFAULT '',
+            smtp_port          INTEGER NOT NULL DEFAULT 465,
+            archive_password   TEXT NOT NULL DEFAULT '',
+            subject_template   TEXT NOT NULL DEFAULT '',
+            default_recipients TEXT NOT NULL DEFAULT '[]',
+            default_bcc        TEXT NOT NULL DEFAULT '[]',
+            updated_at         INTEGER NOT NULL DEFAULT 0,
+            updated_by         TEXT
+        )
+    """)
+    conn.execute(
+        "INSERT OR IGNORE INTO rshb_mailer_settings "
+        "(id, sender_email, smtp_host, smtp_port, subject_template, "
+        " default_recipients, default_bcc, updated_at) "
+        "VALUES (1, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "system@kwikpay.ru",
+            "smtp.mail.ru",
+            465,
+            "Отчет по клирингу за {date} 183014",
+            json.dumps(["perevod_mt@rshb.ru", "mfr@rshb.ru", "espp@rshb.ru"]),
+            json.dumps(["m.alieva@kwikpay.ru"]),
+            _now,
+        ),
     )
 
     # Кластеры Pacemaker (управление через SSH)
@@ -3096,6 +3141,328 @@ def balancer_creds_set():
     conn.execute(f"UPDATE balancer_credentials SET {', '.join(fields)} WHERE id = ?", args)
     conn.commit()
     return jsonify({"ok": True})
+
+
+# ===== Отправка отчёта по клирингу РСХБ =====
+RSHB_MAX_FILE_BYTES = 50 * 1024 * 1024  # 50 MB
+RSHB_MAX_ADDRESS_LIST = 50
+RSHB_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
+
+
+def _rshb_parse_list(raw, field_name):
+    """Принимает list[str] или TEXT с переносами строк/запятыми. Возвращает list[str] или поднимает ValueError."""
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        items = [s.strip() for s in re.split(r"[\s,;]+", raw) if s.strip()]
+    elif isinstance(raw, list):
+        items = [str(s).strip() for s in raw if str(s).strip()]
+    else:
+        raise ValueError(f"Поле {field_name} должно быть списком или строкой")
+    if len(items) > RSHB_MAX_ADDRESS_LIST:
+        raise ValueError(f"В поле {field_name} не более {RSHB_MAX_ADDRESS_LIST} адресов")
+    for it in items:
+        if not RSHB_EMAIL_RE.match(it):
+            raise ValueError(f"Некорректный email в поле {field_name}: {it}")
+    return items
+
+
+def _rshb_load_row():
+    return db().execute("SELECT * FROM rshb_mailer_settings WHERE id = 1").fetchone()
+
+
+@app.get("/api/rshb-mailer/settings")
+def rshb_mailer_settings_get():
+    _, err = require_route("rshb_mailer_settings")
+    if err: return err
+    row = _rshb_load_row()
+    if not row:
+        return jsonify({})
+    try:
+        recipients = json.loads(row["default_recipients"] or "[]")
+        bcc = json.loads(row["default_bcc"] or "[]")
+    except Exception:
+        recipients, bcc = [], []
+    return jsonify({
+        "sender_email":          row["sender_email"] or "",
+        "sender_password_set":   bool(row["sender_password"]),
+        "smtp_host":             row["smtp_host"] or "",
+        "smtp_port":             row["smtp_port"] or 465,
+        "archive_password_set":  bool(row["archive_password"]),
+        "subject_template":      row["subject_template"] or "",
+        "default_recipients":    recipients,
+        "default_bcc":           bcc,
+        "updated_at":            row["updated_at"] or 0,
+        "updated_by":            row["updated_by"] or "",
+    })
+
+
+@app.post("/api/rshb-mailer/settings")
+def rshb_mailer_settings_set():
+    u, err = require_route("rshb_mailer_settings")
+    if err: return err
+    data = request.get_json(silent=True) or {}
+    fields, args = [], []
+    def upd(name, val):
+        fields.append(f"{name} = ?")
+        args.append(val)
+
+    if "sender_email" in data:
+        email = (data["sender_email"] or "").strip()
+        if email and not RSHB_EMAIL_RE.match(email):
+            return jsonify({"error": "Некорректный email отправителя"}), 400
+        upd("sender_email", email)
+
+    if "smtp_host" in data:
+        upd("smtp_host", (data["smtp_host"] or "").strip())
+
+    if "smtp_port" in data:
+        try:
+            p = int(data["smtp_port"]); assert 1 <= p <= 65535
+        except Exception:
+            return jsonify({"error": "smtp_port должен быть числом 1..65535"}), 400
+        upd("smtp_port", p)
+
+    if "subject_template" in data:
+        tmpl = (data["subject_template"] or "").strip()
+        if len(tmpl) > 500:
+            return jsonify({"error": "Шаблон темы слишком длинный"}), 400
+        upd("subject_template", tmpl)
+
+    if "default_recipients" in data:
+        try:
+            lst = _rshb_parse_list(data["default_recipients"], "default_recipients")
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        upd("default_recipients", json.dumps(lst))
+
+    if "default_bcc" in data:
+        try:
+            lst = _rshb_parse_list(data["default_bcc"], "default_bcc")
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        upd("default_bcc", json.dumps(lst))
+
+    # Пароли: пустая строка = не менять, непустая = шифруем и пишем.
+    for fld in ("sender_password", "archive_password"):
+        if fld in data and (data[fld] or "") != "":
+            upd(fld, encrypt_secret(data[fld]))
+
+    if not fields:
+        return jsonify({"ok": True, "noop": True})
+
+    fields.append("updated_at = ?"); args.append(int(time.time()))
+    fields.append("updated_by = ?"); args.append(u["username"])
+    args.append(1)
+    conn = db()
+    conn.execute(f"UPDATE rshb_mailer_settings SET {', '.join(fields)} WHERE id = ?", args)
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/rshb-mailer/defaults")
+def rshb_mailer_defaults_get():
+    """Для странички «Отправка»: только то, что нужно для предзаполнения формы.
+    Пароли не отдаём, флаги не отдаём — все секреты остаются на бэке."""
+    _, err = require_route("rshb_mailer")
+    if err: return err
+    row = _rshb_load_row()
+    if not row:
+        return jsonify({})
+    try:
+        recipients = json.loads(row["default_recipients"] or "[]")
+        bcc = json.loads(row["default_bcc"] or "[]")
+    except Exception:
+        recipients, bcc = [], []
+    return jsonify({
+        "sender_email":       row["sender_email"] or "",
+        "subject_template":   row["subject_template"] or "",
+        "default_recipients": recipients,
+        "default_bcc":        bcc,
+        "ready": bool(
+            row["sender_email"] and row["sender_password"]
+            and row["archive_password"] and row["smtp_host"]
+        ),
+    })
+
+
+@app.post("/api/rshb-mailer/send")
+def rshb_mailer_send():
+    u, err = require_route("rshb_mailer")
+    if err: return err
+    if py7zr is None:
+        return jsonify({"error": "Сервер не настроен: модуль py7zr не установлен"}), 500
+
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        return jsonify({"error": "Не выбран файл для отправки"}), 400
+
+    # Проверим размер заранее (без чтения всего в память):
+    try:
+        upload.stream.seek(0, os.SEEK_END)
+        size = upload.stream.tell()
+        upload.stream.seek(0)
+    except Exception:
+        size = None
+    if size is not None and size > RSHB_MAX_FILE_BYTES:
+        return jsonify({"error": f"Файл больше {RSHB_MAX_FILE_BYTES // (1024*1024)} MB"}), 400
+
+    row = _rshb_load_row()
+    if not row:
+        return jsonify({"error": "Настройки не инициализированы"}), 500
+
+    sender_email     = (row["sender_email"] or "").strip()
+    sender_password  = decrypt_secret(row["sender_password"])
+    smtp_host        = (row["smtp_host"] or "").strip()
+    smtp_port        = int(row["smtp_port"] or 465)
+    archive_password = decrypt_secret(row["archive_password"])
+    subject_template = row["subject_template"] or "Отчет по клирингу за {date}"
+
+    if not sender_email or not sender_password:
+        return jsonify({"error": "В настройках не задан email или пароль отправителя"}), 400
+    if not archive_password:
+        return jsonify({"error": "В настройках не задан пароль архива"}), 400
+    if not smtp_host:
+        return jsonify({"error": "В настройках не задан SMTP-сервер"}), 400
+
+    # Получатели/BCC: либо из формы, либо дефолты.
+    try:
+        recipients = _rshb_parse_list(request.form.get("recipients"), "recipients")
+        bcc = _rshb_parse_list(request.form.get("bcc"), "bcc")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    if recipients is None:
+        try:
+            recipients = json.loads(row["default_recipients"] or "[]")
+        except Exception:
+            recipients = []
+    if bcc is None:
+        try:
+            bcc = json.loads(row["default_bcc"] or "[]")
+        except Exception:
+            bcc = []
+    if not recipients:
+        return jsonify({"error": "Список получателей пуст"}), 400
+
+    date_val = (request.form.get("date") or "").strip()
+    if not date_val:
+        return jsonify({"error": "Не указана дата для темы письма"}), 400
+    if len(date_val) > 32:
+        return jsonify({"error": "Слишком длинное значение даты"}), 400
+
+    try:
+        subject = subject_template.format(date=date_val)
+    except (KeyError, IndexError):
+        subject = f"{subject_template} {date_val}"
+    body = subject
+
+    # Безопасное имя файла
+    base_name = os.path.basename(upload.filename).strip().replace("\x00", "")
+    if not base_name:
+        base_name = "report.bin"
+    archive_name = os.path.splitext(base_name)[0] + ".7z"
+
+    tmp_src = tmp_arc = None
+    try:
+        # 1) Сохраняем upload в tmp
+        fd_src, tmp_src = tempfile.mkstemp(prefix="rshb_src_", suffix="_" + base_name)
+        os.close(fd_src)
+        upload.save(tmp_src)
+
+        # 2) Архивируем в 7z с паролем
+        fd_arc, tmp_arc = tempfile.mkstemp(prefix="rshb_arc_", suffix=".7z")
+        os.close(fd_arc)
+        with py7zr.SevenZipFile(tmp_arc, "w", password=archive_password) as zf:
+            zf.write(tmp_src, base_name)
+
+        # 3) Формируем письмо
+        msg = MIMEMultipart()
+        msg["From"] = sender_email
+        msg["To"] = ", ".join(recipients)
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+
+        with open(tmp_arc, "rb") as f:
+            part = MIMEBase("application", "x-7z-compressed")
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f'attachment; filename="{archive_name}"')
+        msg.attach(part)
+
+        # 4) Отправка
+        if smtp_port == 465:
+            smtp = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
+        else:
+            smtp = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
+            smtp.starttls()
+
+        all_addrs = recipients + bcc
+        per_addr = {}  # email -> {"ok": bool, "code": int|None, "error": str}
+        try:
+            smtp.login(sender_email, sender_password)
+            try:
+                refused = smtp.sendmail(sender_email, all_addrs, msg.as_string()) or {}
+            except smtplib.SMTPRecipientsRefused as exc:
+                # Все адреса отклонены — письмо не отправлено никому.
+                refused = exc.recipients or {}
+                for addr in all_addrs:
+                    entry = refused.get(addr)
+                    if entry:
+                        code, message = entry
+                        msg_str = message.decode("utf-8", "replace") if isinstance(message, bytes) else str(message)
+                        per_addr[addr] = {"ok": False, "code": code, "error": msg_str.strip()}
+                    else:
+                        per_addr[addr] = {"ok": False, "code": None, "error": "Отклонено сервером"}
+            else:
+                # Частичный отказ: refused содержит только отклонённые, остальные приняты.
+                for addr in all_addrs:
+                    if addr in refused:
+                        code, message = refused[addr]
+                        msg_str = message.decode("utf-8", "replace") if isinstance(message, bytes) else str(message)
+                        per_addr[addr] = {"ok": False, "code": code, "error": msg_str.strip()}
+                    else:
+                        per_addr[addr] = {"ok": True, "code": 250, "error": ""}
+        finally:
+            try: smtp.quit()
+            except Exception: pass
+
+    except smtplib.SMTPAuthenticationError:
+        return jsonify({"error": "Неверный логин или пароль от почты"}), 400
+    except smtplib.SMTPException as e:
+        app.logger.error("RSHB mailer SMTP error (user=%s): %s", u["username"], e)
+        return jsonify({"error": f"Ошибка почтового сервера: {e}"}), 502
+    except OSError as e:
+        app.logger.error("RSHB mailer IO error (user=%s): %s", u["username"], e)
+        return jsonify({"error": f"Ошибка ввода-вывода: {e}"}), 500
+    except Exception as e:
+        app.logger.exception("RSHB mailer unexpected error (user=%s)", u["username"])
+        return jsonify({"error": f"Внутренняя ошибка: {e}"}), 500
+    finally:
+        for p in (tmp_src, tmp_arc):
+            if p:
+                try: os.remove(p)
+                except Exception: pass
+
+    def _status_list(addrs, kind):
+        out = []
+        for a in addrs:
+            r = per_addr.get(a, {"ok": False, "code": None, "error": "Неизвестно"})
+            out.append({"email": a, "type": kind, **r})
+        return out
+
+    recipients_status = _status_list(recipients, "to")
+    bcc_status = _status_list(bcc, "bcc")
+    ok_count = sum(1 for s in recipients_status + bcc_status if s["ok"])
+    fail_count = len(recipients_status) + len(bcc_status) - ok_count
+
+    return jsonify({
+        "ok": ok_count > 0,
+        "ok_count": ok_count,
+        "fail_count": fail_count,
+        "recipients": recipients_status,
+        "bcc": bcc_status,
+        "filename": archive_name,
+    })
 
 
 ABOUT_MAX_BYTES = 512 * 1024
