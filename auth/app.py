@@ -46,9 +46,9 @@ from email.mime.text import MIMEText
 from cryptography.fernet import Fernet, InvalidToken
 
 try:
-    import py7zr
+    import pyzipper
 except Exception:
-    py7zr = None
+    pyzipper = None
 
 app = Flask(__name__)
 
@@ -3290,8 +3290,8 @@ def rshb_mailer_defaults_get():
 def rshb_mailer_send():
     u, err = require_route("rshb_mailer")
     if err: return err
-    if py7zr is None:
-        return jsonify({"error": "Сервер не настроен: модуль py7zr не установлен"}), 500
+    if pyzipper is None:
+        return jsonify({"error": "Сервер не настроен: модуль pyzipper не установлен"}), 500
 
     upload = request.files.get("file")
     if upload is None or not upload.filename:
@@ -3360,7 +3360,7 @@ def rshb_mailer_send():
     base_name = os.path.basename(upload.filename).strip().replace("\x00", "")
     if not base_name:
         base_name = "report.bin"
-    archive_name = os.path.splitext(base_name)[0] + ".7z"
+    archive_name = os.path.splitext(base_name)[0] + ".zip"
 
     tmp_src = tmp_arc = None
     try:
@@ -3369,10 +3369,15 @@ def rshb_mailer_send():
         os.close(fd_src)
         upload.save(tmp_src)
 
-        # 2) Архивируем в 7z с паролем
-        fd_arc, tmp_arc = tempfile.mkstemp(prefix="rshb_arc_", suffix=".7z")
+        # 2) Архивируем в ZIP с AES-256 паролем (pyzipper)
+        fd_arc, tmp_arc = tempfile.mkstemp(prefix="rshb_arc_", suffix=".zip")
         os.close(fd_arc)
-        with py7zr.SevenZipFile(tmp_arc, "w", password=archive_password) as zf:
+        with pyzipper.AESZipFile(
+            tmp_arc, "w",
+            compression=pyzipper.ZIP_DEFLATED,
+            encryption=pyzipper.WZ_AES,
+        ) as zf:
+            zf.setpassword(archive_password.encode("utf-8"))
             zf.write(tmp_src, base_name)
 
         # 3) Формируем письмо
@@ -3383,7 +3388,7 @@ def rshb_mailer_send():
         msg.attach(MIMEText(body, "plain", "utf-8"))
 
         with open(tmp_arc, "rb") as f:
-            part = MIMEBase("application", "x-7z-compressed")
+            part = MIMEBase("application", "zip")
             part.set_payload(f.read())
         encoders.encode_base64(part)
         part.add_header("Content-Disposition", f'attachment; filename="{archive_name}"')
